@@ -1,7 +1,7 @@
 import React from 'react';
 import { initializeApp } from '@firebase/app';
 import { getFirestore } from "firebase/firestore";
-import { collection, doc, addDoc, setDoc } from "firebase/firestore";
+import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
 
 const firebaseConfig = {
@@ -18,122 +18,6 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore();
 const rtdb = getDatabase();
 
-/*
-class Whiteboard {
-    constructor(container, numOfPages, data) {
-        this.pages = [];
-        this.ctxs = [];
-        for (let i = 0; i < numOfPages; i++) {
-            this.createNewPage(container);
-        }
-        // set up data
-        this.dataList = [];
-        this.startStatus = false;
-        this.reloadStatus = false;
-        this.expectedObjectIndex = 0;
-        this.activePage = 0;
-        this.requiredReloadAfterAction = false;
-    }
-
-    createNewPage(container){
-        const canvas = document.createElement("canvas");
-        canvas.height = 100;
-        canvas.width = 100;
-        canvas.style.backgroundColor = "red";
-        canvas.style.margin = "5px";
-        container.appendChild(canvas);
-        this.pages.push(canvas);
-        this.ctxs.push(canvas.getContext("2d"));
-    }
-
-    async reload(maxIndexFromLoadedData) {
-        this.reloadStatus = true;
-        // refreshing page
-        console.log("Reloading...");
-        this.reloadStatus = false;
-    }
-
-    refresh(dataIndx){
-        let data = this.dataList[this.dataList];
-        if(data["actionType"]==0){
-            this.ctxs[data.pageIndex].beginPath();
-            this.ctxs[data.pageIndex].moveTo(data.satrt[0], data.start[1]);
-            for(let i = 0; i < data.points.length; i++){
-                this.ctxs[data.pageIndex].lineTo(data.points[i][0], data.points[i][1]);
-            }
-            this.ctxs[data.pageIndex].stroke();
-            this.ctxs[data.pageIndex].closePath();
-        }
-    }
-
-    update(data) {
-        if (data.actionType == 0) {
-            // when starts drawing a new object, first check if the previous drawing has completed. if not, reload the data.
-            if (this.startStatus) {
-                this.reload(data.objectIndex - 1);
-            }
-            this.startStatus = true;
-            // check if current object index mathches with the object index got from the server. if not, reload.
-            if (data.objectIndex != this.expectedObjectIndex) {
-                if (!this.reloadStatus) {
-                    this.reload(this.objectIndex - 1);
-                }
-                this.expectedObjectIndex = data.objectIndex;
-            }
-            // check if the current page is active. if not, active page first.
-            if (!this.activePage != data.pageIndex) {
-                // if the page doesn't exists, create new page.
-            }
-
-            this.dataList[this.objectIndex] = {};
-            this.dataList[this.objectIndex]["actionType"] = 0;
-            this.dataList[this.objectIndex]["start"] = [data.x, data.y];
-            this.dataList[this.objectIndex]["points"] = [];
-            this.dataList[this.objectIndex]["pageIndex"] = data.pageIndex;
-
-            if (data.objectType == 0) {
-                this.ctxs[data.pageIndex].beginPath();
-                this.ctxs[data.pageIndex].moveTo(data.x, data.y);
-            }
-        }
-        else if (data.actionType == 1) {
-            // when continues drawing a new object, first check if the drawing has started. if not, reload after getting an interval (end of action).
-            // check if current object index mathches the object index got from the server. if not, reload after interval.
-            // check if the current page is active. if not, reload after interval.
-            if (!this.startStatus || data.objectIndex != this.expectedObjectIndex || !this.activePage != data.pageIndex) {
-                this.requiredReloadAfterAction = true;
-            }
-            else {
-                if (data.objectType == 0) {
-                    this.dataList[data.objectIndex]["points"].push([data.x, data.y]);
-                    this.ctxs[data.pageIndex].lineTo(data.x, data.y);
-                    this.ctxs[data.pageIndex].stroke();
-                }
-
-            }
-        }
-        else if (data.actionType == 2) {
-            // when ends drawing an object, check if the drawing started. if not, reload the data.
-            // check if requires reload
-            // check if current object index mathches the object index got from the server. if not, reload after interval.
-            // check if the current page is active. if not, reload after interval.
-            if (this.requiredReloadAfterAction || !this.startStatus || data.objectIndex != this.expectedObjectIndex || !this.activePage != data.pageIndex) {
-                this.reload(data.objectIndex);
-            }
-            else {
-                if (data.objectType == 0) {
-                    this.dataList[data.objectIndex]["end"] = [data.x, data.y];
-                    this.ctxs[data.pageIndex].lineTo(data.x, data.y);
-                    this.ctxs[data.pageIndex].stroke();
-                    this.ctxs[data.pageIndex].closePath();
-                }
-            }
-        }
-
-    }
-}
-*/
-
 class Whiteboard {
     constructor(container, role, whiteboardId) {
         this.pages = [];
@@ -148,6 +32,7 @@ class Whiteboard {
         this.whiteboardId = whiteboardId;
         this.lastData = undefined;
         this.drawing = false;
+        this.currentObjectIndex = 0;
         onValue(ref(rtdb, whiteboardId), (snapshot) => {
             if (!snapshot.val()) return;
 
@@ -156,34 +41,45 @@ class Whiteboard {
                 this.drawTmp(data);
             }
         });
+
+        this.loadData();
     }
 
     async loadData() {
-
+        console.log("data loading")
+        const querySnapshot = await getDocs(collection(db, "sessions", this.whiteboardId, "objects"));
+        querySnapshot.forEach((doc) => {
+            // console.log(doc.id, " => ", doc.data());
+            this.dataList[doc.data().indx] = JSON.parse(doc.data().data);
+            this.draw(doc.data().indx);
+            // console.log("***", doc.data());
+        });
     }
 
-    async syncData() {
+    async syncData(indx) {
         try {
-            await setDoc(doc(db, "sessions", this.whiteboardId, "objects", "" + (this.dataList.length - 1)), {
-                data: JSON.stringify(this.dataList[this.dataList.length - 1]),
-                indx: this.dataList.length - 1
+            await setDoc(doc(db, "sessions", this.whiteboardId, "objects", "" + indx), {
+                data: JSON.stringify(this.dataList[indx]),
+                indx: indx
             });
         }
         catch (err) {
             console.log("Error sync data, Err:", err);
         }
-        console.log(this.dataList[this.dataList.length - 1]);
+        // console.log(this.dataList[this.dataList.length - 1]);
     }
 
     mouseDownListener(e) {
         if (this.role != "editor") return;
         this.drawing = true;
+        this.currentObjectIndex = this.dataList.length;
         set(ref(rtdb, this.whiteboardId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
             a: 0,
             p: this.activePage,
-            o: 0
+            o: 0,
+            i: this.currentObjectIndex
         });
     }
 
@@ -194,7 +90,8 @@ class Whiteboard {
             y: e.clientY - e.target.offsetTop,
             a: this.drawing ? 1 : 3,
             p: this.activePage,
-            o: 0
+            o: 0,
+            i: this.currentObjectIndex
         });
     }
 
@@ -205,9 +102,11 @@ class Whiteboard {
             y: e.clientY - e.target.offsetTop,
             a: this.drawing ? 2 : 3,
             p: this.activePage,
-            o: 0
+            o: 0,
+            i: this.currentObjectIndex
         });
-        if (this.drawing) this.syncData();
+        // console.log(this.dataList, "*****");
+        if (this.drawing) this.syncData(this.currentObjectIndex);
         this.drawing = false;
     }
 
@@ -229,28 +128,31 @@ class Whiteboard {
         if (!data) return;
         while (this.pages.length <= data.p) this.createNewPage(this.container);
         if (data.a == 0) {
-            this.dataList.push({
+            this.dataList[data.i] = {
                 s: [data.x, data.y],
                 o: data.o,
                 page: data.p,
                 p: [],
                 e: []
-            });
+            };
 
             this.tmpCtx.beginPath();
             this.tmpCtx.moveTo(data.x, data.y);
         }
         else if (data.a == 1) {
-            this.dataList[this.dataList.length - 1].p.push([data.x, data.y]);
+            if (!this.dataList[data.i]) return;
+            this.dataList[data.i].p.push([data.x, data.y]);
             this.tmpCtx.lineTo(data.x, data.y);
             this.tmpCtx.stroke();
         }
         else if (data.a == 2) {
-            this.dataList[this.dataList.length - 1].e.push(data.x);
-            this.dataList[this.dataList.length - 1].e.push(data.y);
+            // console.log(this.dataList[data.i], data.i);
+            if (!this.dataList[data.i]) return;
+            this.dataList[data.i].e.push(data.x);
+            this.dataList[data.i].e.push(data.y);
             this.tmpCtx.moveTo(data.x, data.y);
             this.tmpCtx.closePath();
-            this.draw(this.dataList.length - 1);
+            this.draw(data.i);
         }
     }
 
@@ -366,4 +268,22 @@ export default Canvas;
 
     objectIndex
     pageIndex
+*/
+
+
+/*
+1. Number of pages
+2. Authorized meeting
+3. Join permission
+4. Session lock
+5. Number of participants
+6. Save session
+7. Time limit
+
+#Whiteboard
+#Blackboard
+
+=>Static Board
+=>Shareable board
+
 */
