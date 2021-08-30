@@ -3,6 +3,7 @@ import { initializeApp } from '@firebase/app';
 import { getFirestore } from "firebase/firestore";
 import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
     apiKey: "AIzaSyB79GSw0yI2tSGXzeOSjeqj5K89fDj9Cyc",
@@ -14,9 +15,10 @@ const firebaseConfig = {
     appId: "1:22709255986:web:e691d35563c243796a212b"
 };
 
-const app = initializeApp(firebaseConfig);
+initializeApp(firebaseConfig);
 const db = getFirestore();
 const rtdb = getDatabase();
+const auth = getAuth();
 
 class Whiteboard {
     constructor(container, role, whiteboardId) {
@@ -27,8 +29,10 @@ class Whiteboard {
         this.role = role;
         this.tmpCtx = undefined;
         this.container = container;
-        this.createNewPage(container);
-        this.createTempCanvas(container);
+        this.createNewPage();
+        this.createTempCanvas();
+        this.activePage = -1;
+        this.navigatePage(0);
         this.whiteboardId = whiteboardId;
         this.lastData = undefined;
         this.drawing = false;
@@ -37,12 +41,16 @@ class Whiteboard {
             if (!snapshot.val()) return;
 
             var data = snapshot.val();
-            if (!this.lastData || this.lastData.x != data.x || this.lastData.y != data.y || this.lastData.a != data.a || this.lastData.p != data.p || this.lastData.o != data.o) {
+            if (!this.lastData || this.lastData.x !== data.x || this.lastData.y !== data.y || this.lastData.a !== data.a || this.lastData.p !== data.p || this.lastData.o !== data.o) {
                 this.drawTmp(data);
             }
         });
 
         this.loadData();
+
+        this.drawingProps = {
+            activeObject: 0
+        }
     }
 
     async loadData() {
@@ -52,7 +60,6 @@ class Whiteboard {
             // console.log(doc.id, " => ", doc.data());
             this.dataList[doc.data().indx] = JSON.parse(doc.data().data);
             this.draw(doc.data().indx);
-            // console.log("***", doc.data());
         });
     }
 
@@ -70,7 +77,7 @@ class Whiteboard {
     }
 
     mouseDownListener(e) {
-        if (this.role != "editor") return;
+        if (this.role !== "editor") return;
         this.drawing = true;
         this.currentObjectIndex = this.dataList.length;
         set(ref(rtdb, this.whiteboardId), {
@@ -78,31 +85,31 @@ class Whiteboard {
             y: e.clientY - e.target.offsetTop,
             a: 0,
             p: this.activePage,
-            o: 0,
+            o: this.drawingProps.activeObject,
             i: this.currentObjectIndex
         });
     }
 
     mouseMoveListener(e) {
-        if (this.role != "editor") return;
+        if (this.role !== "editor") return;
         set(ref(rtdb, this.whiteboardId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
             a: this.drawing ? 1 : 3,
             p: this.activePage,
-            o: 0,
+            o: this.drawingProps.activeObject,
             i: this.currentObjectIndex
         });
     }
 
     mouseUpListener(e) {
-        if (this.role != "editor") return;
+        if (this.role !== "editor") return;
         set(ref(rtdb, this.whiteboardId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
             a: this.drawing ? 2 : 3,
             p: this.activePage,
-            o: 0,
+            o: this.drawingProps.activeObject,
             i: this.currentObjectIndex
         });
         // console.log(this.dataList, "*****");
@@ -111,7 +118,8 @@ class Whiteboard {
     }
 
     draw(indx) {
-        if (this.dataList[indx].o == 0) {
+        while (this.pages.length <= this.dataList[indx].page) this.createNewPage(this.container);
+        if (this.dataList[indx].o === 0) {
             let data = this.dataList[indx];
             this.ctx[data.page].beginPath();
             this.ctx[data.page].moveTo(data.s[0], data.s[1]);
@@ -124,10 +132,20 @@ class Whiteboard {
         }
     }
 
+    navigatePage(page) {
+        if (this.activePage === page || page >= this.pages.length || page < 0) return;
+        for (let i = 0; i < this.pages.length; i++) {
+            this.pages[i].style.border = "none";
+        }
+        this.pages[page].style.border = "5px solid red";
+        this.activePage = page;
+    }
+
     drawTmp(data) {
         if (!data) return;
+        this.navigatePage(data.p);
         while (this.pages.length <= data.p) this.createNewPage(this.container);
-        if (data.a == 0) {
+        if (data.a === 0) {
             this.dataList[data.i] = {
                 s: [data.x, data.y],
                 o: data.o,
@@ -139,13 +157,13 @@ class Whiteboard {
             this.tmpCtx.beginPath();
             this.tmpCtx.moveTo(data.x, data.y);
         }
-        else if (data.a == 1) {
+        else if (data.a === 1) {
             if (!this.dataList[data.i]) return;
             this.dataList[data.i].p.push([data.x, data.y]);
             this.tmpCtx.lineTo(data.x, data.y);
             this.tmpCtx.stroke();
         }
-        else if (data.a == 2) {
+        else if (data.a === 2) {
             // console.log(this.dataList[data.i], data.i);
             if (!this.dataList[data.i]) return;
             this.dataList[data.i].e.push(data.x);
@@ -156,22 +174,22 @@ class Whiteboard {
         }
     }
 
-    createNewPage(container) {
+    createNewPage() {
         const canvas = document.createElement("canvas");
-        canvas.height = 300;
-        canvas.width = 600;
+        canvas.height = 200;
+        canvas.width = 200;
         canvas.style.backgroundColor = "#999";
         this.pages.push(canvas);
-        container.appendChild(canvas);
+        this.container.appendChild(canvas);
         this.ctx.push(canvas.getContext("2d"));
     }
 
-    createTempCanvas(container) {
+    createTempCanvas() {
         let canvas = document.createElement("canvas");
-        canvas.height = 300;
-        canvas.width = 600;
+        canvas.height = 200;
+        canvas.width = 200;
         canvas.style.backgroundColor = "#77f";
-        container.appendChild(canvas);
+        this.container.appendChild(canvas);
         canvas.addEventListener("mousedown", this.mouseDownListener.bind(this));
         canvas.addEventListener("mousemove", this.mouseMoveListener.bind(this));
         canvas.addEventListener("mouseup", this.mouseUpListener.bind(this));
@@ -184,6 +202,13 @@ class Whiteboard {
 class Canvas extends React.Component {
     constructor(props) {
         super(props);
+        this.board = null;
+
+        this.createNewSession = this.createNewSession.bind(this);
+        this.joinExistingSession = this.joinExistingSession.bind(this);
+        this.handleAddNewPage = this.handleAddNewPage.bind(this);
+        this.handleGoNextPage = this.handleGoNextPage.bind(this);
+        this.handleGoPrevPage = this.handleGoPrevPage.bind(this);
     }
 
     async createNewSession() {
@@ -200,7 +225,7 @@ class Canvas extends React.Component {
             try {
                 // const ref2 = await setDoc(doc(db, "sessions", ref.id, "objects", "start"), {});
                 console.log("Session Startted");
-                new Whiteboard(document.body, "editor", ref.id);
+                this.board = new Whiteboard(document.body, "editor", ref.id);
             }
             catch (e) {
                 console.log("Something went wrong, Err:", e);
@@ -212,30 +237,38 @@ class Canvas extends React.Component {
     }
 
     async joinExistingSession() {
-        new Whiteboard(document.body, "viewer", document.getElementById("session-id").value);
+        this.board = new Whiteboard(document.body, "viewer", document.getElementById("session-id").value);
+    }
+
+    handleAddNewPage() {
+        if (!this.board || this.board.role !== "editor") return;
+        this.board.createNewPage();
+    }
+
+    handleGoNextPage() {
+        if (!this.board || this.board.role !== "editor") return;
+        this.board.navigatePage(this.board.activePage + 1);
+    }
+
+    handleGoPrevPage() {
+        if (!this.board || this.board.role !== "editor") return;
+        this.board.navigatePage(this.board.activePage - 1);
     }
 
     componentDidMount() {
-        // this.createNewSession();
-        // try {
-        //     const docRef = await setDoc(doc(db, "sessions", "1"), {
-        //         first: "Ada",
-        //         last: "Lovelace",
-        //         born: 1815
-        //     });
-        //     console.log("Document written with ID: ", docRef);
-        // } catch (e) {
-        //     console.log("Error ", e);
-        // }
-
-        // try {
-        //     const ref = await setDoc(collection(db, "sessions", "1", "2"), {
-        //         x: "xxx"
-        //     });
-        //     console.log("done");
-        // } catch (e) {
-        //     console.log(e);
-        // }
+        signInAnonymously(auth).then(() => {
+            console.log("Signed in as:");
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    console.log(user.uid);
+                }
+                else {
+                    console.log("logged out...");
+                }
+            });
+        }).catch((err) => {
+            console.log("Error Login:", err);
+        });
     }
 
     render() {
@@ -244,6 +277,9 @@ class Canvas extends React.Component {
                 <button onClick={this.createNewSession}>Start New Session</button>
                 <input type="text" id="session-id" />
                 <button onClick={this.joinExistingSession}>Join Session</button>
+                <button onClick={this.handleAddNewPage}>Add New Page</button>
+                <button onClick={this.handleGoPrevPage}>Prev</button>
+                <button onClick={this.handleGoNextPage}>Next</button>
             </div>
         )
     }
@@ -280,10 +316,10 @@ export default Canvas;
 6. Save session
 7. Time limit
 
-#Whiteboard
-#Blackboard
+# Whiteboard
+# Blackboard
 
-=>Static Board
-=>Shareable board
+=> Static Board
+=> Shareable board
 
 */
