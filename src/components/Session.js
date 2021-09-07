@@ -47,7 +47,8 @@ class Whiteboard {
             height: props.height,
             width: props.width,
             container: props.container,
-            drawing: false
+            drawing: false,
+            undoStackCount: 0
         };
         this.action = {
             updatePointer: props.updatePointer
@@ -71,7 +72,7 @@ class Whiteboard {
             if (!snapshot.val()) return;
 
             var data = snapshot.val();
-            if (!this.lastData || this.lastData.x !== data.x || this.lastData.y !== data.y || this.lastData.a !== data.a || this.lastData.p !== data.p || this.lastData.o !== data.o) {
+            if (!this.lastData || this.lastData.x !== data.x || this.lastData.y !== data.y || this.lastData.a !== data.a || this.lastData.p !== data.p || this.lastData.o !== data.o || data.a === 4 || data.a === 5) {
                 this.drawTmp(data);
                 this.lastData = data;
             }
@@ -103,7 +104,8 @@ class Whiteboard {
     mouseDownListener(e) {
         if (this.config.role !== "editor") return;
         this.canvas.drawing = true;
-        this.canvas.currentObject = this.canvas.dataList.length;
+        this.canvas.undoStackCount = 0;
+        this.canvas.currentObject = this.canvas.currentObject + 1;
         set(ref(rtdb, this.config.sessionId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
@@ -141,18 +143,28 @@ class Whiteboard {
     }
 
     undo(indx) {
-        console.log(indx);
+        this.canvas.undoStackCount++;
         for (let i = 0; i < this.canvas.ctx.length; i++) {
             this.canvas.ctx[i].clearRect(0, 0, this.canvas.width, this.canvas.height);
         }
         this.canvas.currentObject = indx;
-        for (let i = 0; i < indx; i++) {
+        for (let i = 0; i <= indx; i++) {
+            this.draw(i);
+        }
+    }
+
+    redo(indx) {
+        this.canvas.undoStackCount--;
+        for (let i = 0; i < this.canvas.ctx.length; i++) {
+            this.canvas.ctx[i].clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+        this.canvas.currentObject = indx;
+        for (let i = 0; i <= indx; i++) {
             this.draw(i);
         }
     }
 
     handleUndo() {
-        console.log(this.canvas.currentObject, "****");
         if (this.config.role !== "editor") return;
         if (this.canvas.currentObject < 0) return;
         set(ref(rtdb, this.config.sessionId), {
@@ -160,6 +172,18 @@ class Whiteboard {
             p: this.canvas.activePage,
             o: this.canvas.activeObject,
             i: this.canvas.currentObject - 1
+        });
+    }
+
+    handleRedo() {
+        if (this.config.role !== "editor") return;
+        if (!this.canvas.dataList[this.canvas.currentObject + 1]) return;
+        if (this.canvas.undoStackCount <= 0) return;
+        set(ref(rtdb, this.config.sessionId), {
+            a: 5,
+            p: this.canvas.activePage,
+            o: this.canvas.activeObject,
+            i: this.canvas.currentObject + 1
         });
     }
 
@@ -216,6 +240,11 @@ class Whiteboard {
         }
         else if (data.a === 4) {
             this.undo(data.i);
+            return;
+        }
+        else if (data.a === 5) {
+            this.redo(data.i);
+            return;
         }
         else {
             if (data.o === 0) {
@@ -385,6 +414,7 @@ class Session extends React.Component {
         this.handleActiveEraser = this.handleActiveEraser.bind(this);
         this.handleChangePointer = this.handleChangePointer.bind(this);
         this.handleUndo = this.handleUndo.bind(this);
+        this.handleRedo = this.handleRedo.bind(this);
     }
 
     async createNewSession() {
@@ -482,6 +512,11 @@ class Session extends React.Component {
         this.board.handleUndo();
     }
 
+    handleRedo() {
+        if (!this.board || this.board.config.role !== "editor") return;
+        this.board.handleRedo();
+    }
+
     componentDidMount() {
         signInAnonymously(auth).then(() => {
             console.log("Signed in as:");
@@ -519,6 +554,7 @@ class Session extends React.Component {
                 <button onClick={this.handleActivePen}>Pen</button>
                 <button onClick={this.handleActiveEraser}>Eraser</button>
                 <button onClick={this.handleUndo}>Undo</button>
+                <button onClick={this.handleRedo}>Redo</button>
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
                 <div id="session-id">{this.state.sessionId}</div>
             </div>
