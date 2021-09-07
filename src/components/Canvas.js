@@ -6,6 +6,7 @@ import { getDatabase, ref, set, onValue } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen } from '@fortawesome/free-solid-svg-icons'
+import { faEraser } from '@fortawesome/free-solid-svg-icons'
 
 import "./../css/canvas.css";
 
@@ -25,24 +26,26 @@ const rtdb = getDatabase();
 const auth = getAuth();
 
 class Whiteboard {
-    constructor(container, role, whiteboardId, bgColor, changePointer) {
-        this.bgColor = bgColor;
+    constructor(props) {
+        // constructor(container, role, whiteboardId, bgColor, changePointer) {
+        this.bgColor = props.bgColor;
         this.pages = [];
+        this.tmpPage = undefined;
         this.ctx = [];
         this.dataList = [];
         this.activePage = 0;
-        this.role = role;
+        this.role = props.role;
         this.tmpCtx = undefined;
-        this.container = container;
+        this.container = props.container;
         this.createNewPage();
         this.createTempCanvas();
         this.activePage = -1;
         this.navigatePage(0);
-        this.whiteboardId = whiteboardId;
+        this.whiteboardId = props.whiteboardId;
         this.lastData = undefined;
         this.drawing = false;
         this.currentObjectIndex = 0;
-        onValue(ref(rtdb, whiteboardId), (snapshot) => {
+        onValue(ref(rtdb, this.whiteboardId), (snapshot) => {
             if (!snapshot.val()) return;
 
             var data = snapshot.val();
@@ -57,7 +60,7 @@ class Whiteboard {
             activeObject: 0
         }
 
-        this.changePointer = changePointer;
+        this.changePointer = props.changePointer;
     }
 
     async loadData() {
@@ -148,7 +151,7 @@ class Whiteboard {
             // this.ctx[data.page].strokeStyle = this.bgColor;
             this.ctx[data.page].globalCompositeOperation = "destination-out";
             this.ctx[data.page].beginPath();
-            this.ctx[data.page].lineWidth = 10;
+            this.ctx[data.page].lineWidth = 20;
             this.ctx[data.page].lineJoin = "round";
             this.ctx[data.page].lineCap = "round";
             this.ctx[data.page].moveTo(data.s[0], data.s[1]);
@@ -174,16 +177,26 @@ class Whiteboard {
             this.changePointer({
                 top: data.y,
                 left: data.x,
-                vis: this.role == "editor" ? "none" : "inline-block"
+                icon: data.o,
+                vis: this.role === "editor" ? "none" : "inline-block"
             });
         }
         else {
-            if (data.o == 0) {
+            if (data.o === 0) {
                 this.changePointer({
                     top: data.y - 15,
                     left: data.x,
-                    vis: this.role == "editor" ? "none" : "inline-block"
-                })
+                    icon: 0,
+                    vis: this.role === "editor" ? "none" : "inline-block"
+                });
+            }
+            else if (data.o === 1) {
+                this.changePointer({
+                    top: data.y - 15,
+                    left: data.x,
+                    icon: 1,
+                    vis: this.role === "editor" ? "none" : "inline-block"
+                });
             }
         }
 
@@ -232,7 +245,7 @@ class Whiteboard {
 
                 this.tmpCtx.strokeStyle = this.bgColor;
                 this.tmpCtx.beginPath();
-                this.tmpCtx.lineWidth = 10;
+                this.tmpCtx.lineWidth = 20;
                 this.tmpCtx.lineJoin = "round";
                 this.tmpCtx.lineCap = "round";
                 this.tmpCtx.moveTo(data.x, data.y);
@@ -294,6 +307,18 @@ class Whiteboard {
         canvas.addEventListener("mouseup", this.mouseUpListener.bind(this));
         canvas.addEventListener("mouseout", this.mouseUpListener.bind(this));
         this.tmpCtx = canvas.getContext("2d");
+        this.tmpPage = canvas;
+    }
+
+    setCanvasDimension(width, height) {
+        this.tmpPage.height = height;
+        this.tmpPage.width = width;
+        this.tmpCtx.clearRect(0, 0, width, height);
+        for (let i = 0; i < this.pages.length; i++) {
+            this.pages[i].height = height;
+            this.pages[i].width = width;
+            this.ctx[i].clearRect(0, 0, width, height);
+        }
     }
 }
 
@@ -308,7 +333,7 @@ class Pointer extends React.Component {
                 left: this.props.left,
                 zIndex: 1001,
                 display: this.props.vis
-            }}><FontAwesomeIcon icon={faPen} /></div>
+            }}><FontAwesomeIcon icon={this.props.icon === 0 ? faPen : faEraser} /></div>
         )
     }
 }
@@ -323,7 +348,13 @@ class Canvas extends React.Component {
             left: 0,
             top: 0,
             size: 10,
-            vis: "none"
+            vis: "none",
+            icon: 0,
+            sessionId: "",
+            userId: "",
+            loggedIn: false,
+            role: "",
+            hostId: ""
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -337,20 +368,35 @@ class Canvas extends React.Component {
     }
 
     async createNewSession() {
+        if (!this.state.loggedIn) return;
         console.log("Starting New Session");
         try {
             const ref = await addDoc(collection(db, "sessions"), {
-                host: "user-1",
-                participants: [],
+                host: this.state.userId,
+                participants: [this.state.userId],
                 pageCount: 1,
-                objectCount: 0
+                objectCount: 0,
+                width: window.innerWidth,
+                height: window.innerHeight
             });
             console.log("Session Stublished with ID: ", ref.id);
+            this.setState({
+                sessionId: ref.id,
+                role: "editor",
+                hostId: this.state.userId
+            });
             console.log("Setting Up Whiteboard Parameters");
             try {
                 // const ref2 = await setDoc(doc(db, "sessions", ref.id, "objects", "start"), {});
-                console.log("Session Startted");
-                this.board = new Whiteboard(document.getElementById("canvas-container"), "editor", ref.id, "#999", this.handleChangePointer);
+                console.log("Session Started");
+                // this.board = new Whiteboard(document.getElementById("canvas-container"), "editor", ref.id, "#999", this.handleChangePointer);
+                this.board = new Whiteboard({
+                    container: document.getElementById("canvas-container"),
+                    role: "editor",
+                    whiteboardId: ref.id,
+                    bgColor: "#bbb",
+                    changePointer: this.handleChangePointer
+                });
             }
             catch (e) {
                 console.log("Something went wrong, Err:", e);
@@ -362,7 +408,14 @@ class Canvas extends React.Component {
     }
 
     async joinExistingSession() {
-        this.board = new Whiteboard(document.getElementById("canvas-container"), "viewer", document.getElementById("session-id").value, "#999", this.handleChangePointer);
+        // this.board = new Whiteboard(document.getElementById("canvas-container"), "viewer", document.getElementById("session-id").value, "#999", this.handleChangePointer);
+        this.board = new Whiteboard({
+            container: document.getElementById("canvas-container"),
+            role: "viewer",
+            whiteboardId: document.getElementById("session-id").value,
+            bgColor: "#bbb",
+            changePointer: this.handleChangePointer
+        });
     }
 
     handleAddNewPage() {
@@ -371,12 +424,12 @@ class Canvas extends React.Component {
     }
 
     handleGoNextPage() {
-        if (!this.board || this.board.role !== "editor") return;
+        if (!this.board || this.board.role !== "editor" || true) return;
         this.board.navigatePage(this.board.activePage + 1);
     }
 
     handleGoPrevPage() {
-        if (!this.board || this.board.role !== "editor") return;
+        if (!this.board || this.board.role !== "editor" || true) return;
         this.board.navigatePage(this.board.activePage - 1);
     }
 
@@ -400,8 +453,16 @@ class Canvas extends React.Component {
             onAuthStateChanged(auth, (user) => {
                 if (user) {
                     console.log(user.uid);
+                    this.setState({
+                        userId: user.uid,
+                        loggedIn: true
+                    });
                 }
                 else {
+                    this.setState({
+                        userId: "",
+                        loggedIn: false
+                    });
                     console.log("logged out...");
                 }
             });
@@ -422,7 +483,8 @@ class Canvas extends React.Component {
                 <button onClick={this.handleGoNextPage}>Next</button>
                 <button onClick={this.handleActivePen}>Pen</button>
                 <button onClick={this.handleActiveEraser}>Eraser</button>
-                <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} />
+                <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
+                <div id="session-id">{this.state.sessionId}</div>
             </div>
         )
     }
@@ -437,8 +499,9 @@ export default Canvas;
         0 -> start
         1 -> move
         2 -> end
-        3 -> undo
-        4 -> redo
+        3 -> nothing
+        4 -> undo
+        5 -> redo
 
     objectType:
         0 -> pencil
