@@ -1,20 +1,26 @@
 .tmp-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    /* top: 0;
+    left: 0; */
     background-color: transparent;
     z-index: 100;
 }
 
 .drawing-canvas {
     position: fixed;
-    top: 0;
-    left: 0;
+    /* top: 0;
+    left: 0; */
     z-index: 1;
     /* background-color: #eee; */
 }
 
 #canvas-container {
-    height: 500px;
-    width: 500px;
+    height: 100vh;
+    width: 100vw;
+}
+
+#tool-box {
+    position: fixed;
+    bottom: 0;
+    z-index: 110;
 }

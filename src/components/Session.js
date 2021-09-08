@@ -5,7 +5,7 @@ import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faEdit, faPen } from '@fortawesome/free-solid-svg-icons';
+import { faPen } from '@fortawesome/free-solid-svg-icons';
 import { faEraser } from '@fortawesome/free-solid-svg-icons';
 
 import "./../css/canvas.css";
@@ -72,7 +72,7 @@ class Whiteboard {
             if (!snapshot.val()) return;
 
             var data = snapshot.val();
-            if (!this.lastData || this.lastData.x !== data.x || this.lastData.y !== data.y || this.lastData.a !== data.a || this.lastData.p !== data.p || this.lastData.o !== data.o || data.a === 4 || data.a === 5) {
+            if (!this.lastData || this.lastData.x !== data.x || this.lastData.y !== data.y || this.lastData.a !== data.a || this.lastData.p !== data.p || this.lastData.o !== data.o || this.lastData.h !== data.h || this.lastData.w !== data.w || data.a === 4 || data.a === 5) {
                 this.drawTmp(data);
                 this.lastData = data;
             }
@@ -85,8 +85,17 @@ class Whiteboard {
         querySnapshot.forEach((doc) => {
             // console.log(doc.id, " => ", doc.data());
             this.canvas.dataList[doc.data().indx] = JSON.parse(doc.data().data);
-            this.draw(doc.data().indx);
+            // this.draw(doc.data().indx);
         });
+        let intv = setInterval((function () {
+            if (this.canvas.currentObject !== -1) {
+                for (let i = 0; i <= this.canvas.currentObject; i++) {
+                    this.draw(i);
+                }
+                console.log(this.canvas.currentObject);
+                clearInterval(intv);
+            }
+        }).bind(this), 100);
     }
 
     async syncData(indx) {
@@ -109,6 +118,8 @@ class Whiteboard {
         set(ref(rtdb, this.config.sessionId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
+            h: this.canvas.height,
+            w: this.canvas.width,
             a: 0,
             p: this.canvas.activePage,
             o: this.canvas.activeObject,
@@ -121,6 +132,8 @@ class Whiteboard {
         set(ref(rtdb, this.config.sessionId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
+            h: this.canvas.height,
+            w: this.canvas.width,
             a: this.canvas.drawing ? 1 : 3,
             p: this.canvas.activePage,
             o: this.canvas.activeObject,
@@ -133,6 +146,8 @@ class Whiteboard {
         set(ref(rtdb, this.config.sessionId), {
             x: e.clientX - e.target.offsetLeft,
             y: e.clientY - e.target.offsetTop,
+            h: this.canvas.height,
+            w: this.canvas.width,
             a: this.canvas.drawing ? 2 : 3,
             p: this.canvas.activePage,
             o: this.canvas.activeObject,
@@ -169,7 +184,7 @@ class Whiteboard {
         if (this.canvas.currentObject < 0) return;
         set(ref(rtdb, this.config.sessionId), {
             a: 4,
-            p: this.canvas.activePage,
+            p: this.canvas.dataList[this.canvas.currentObject - 1] ? this.canvas.dataList[this.canvas.currentObject - 1].page : 0,
             o: this.canvas.activeObject,
             i: this.canvas.currentObject - 1
         });
@@ -181,7 +196,7 @@ class Whiteboard {
         if (this.canvas.undoStackCount <= 0) return;
         set(ref(rtdb, this.config.sessionId), {
             a: 5,
-            p: this.canvas.activePage,
+            p: this.canvas.dataList[this.canvas.currentObject + 1] ? this.canvas.dataList[this.canvas.currentObject + 1].page : 0,
             o: this.canvas.activeObject,
             i: this.canvas.currentObject + 1
         });
@@ -229,6 +244,10 @@ class Whiteboard {
         while (this.canvas.pages.length <= data.p) this.createNewPage();
         this.navigatePage(data.p);
         this.canvas.activeObject = data.o;
+        this.canvas.currentObject = data.i;
+
+        let x = data.x ? data.x * this.canvas.width / data.w : 0;
+        let y = data.y ? data.y * this.canvas.height / data.h : 0;
 
         if (data.a === 3) {
             this.action.updatePointer({
@@ -240,10 +259,12 @@ class Whiteboard {
         }
         else if (data.a === 4) {
             this.undo(data.i);
+            this.navigatePage(data.p);
             return;
         }
         else if (data.a === 5) {
             this.redo(data.i);
+            this.navigatePage(data.p);
             return;
         }
         else {
@@ -267,7 +288,7 @@ class Whiteboard {
 
         if (data.o === 0) {
             if (data.a === 0) {
-                this.canvas.currentObject = data.i; // updating current object index
+                // this.canvas.currentObject = data.i; // updating current object index
                 this.canvas.dataList[data.i] = {
                     s: [data.x, data.y],
                     o: data.o,
@@ -368,6 +389,27 @@ class Whiteboard {
         canvas.addEventListener("mouseup", this.mouseUpListener.bind(this));
         canvas.addEventListener("mouseout", this.mouseUpListener.bind(this));
     }
+
+    setDimensions() {
+        let canvasWidth = window.innerWidth;
+        let canvasHeight = window.innerWidth * this.canvas.height / this.canvas.width;
+        this.canvas.height = canvasHeight;
+        this.canvas.width = canvasWidth;
+        if (window.innerWidth * this.canvas.height > this.canvas.width * window.innerHeight) {
+            canvasHeight = window.innerHeight;
+            canvasWidth = window.innerHeight * this.canvas.width / this.canvas.height;
+        }
+        for (let i = 0; i < this.canvas.pages.length; i++) {
+            this.canvas.pages[i].height = canvasHeight;
+            this.canvas.pages[i].width = canvasWidth;
+            this.canvas.pages[i].style.top = (window.innerHeight - canvasHeight) / 2 + "px";
+            this.canvas.pages[i].style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+        }
+        this.canvas.tmpPage.height = canvasHeight;
+        this.canvas.tmpPage.width = canvasWidth;
+        this.canvas.tmpPage.style.top = (window.innerHeight - canvasHeight) / 2 + "px";
+        this.canvas.tmpPage.style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+    }
 }
 
 class Pointer extends React.Component {
@@ -447,11 +489,12 @@ class Session extends React.Component {
                     userId: this.state.userId,
                     role: "editor",
                     bgColor: "#bbb",
-                    height: 500,
-                    width: 600,
+                    height: 300,
+                    width: 500,
                     container: document.getElementById("canvas-container"),
                     updatePointer: this.handleChangePointer
                 });
+                this.board.setDimensions();
             }
             catch (e) {
                 console.log("Something went wrong, Err:", e);
@@ -545,18 +588,20 @@ class Session extends React.Component {
         return (
             <div>
                 <div id="canvas-container"></div>
-                <button onClick={this.createNewSession}>Start New Session</button>
-                <input type="text" id="session-id" />
-                <button onClick={this.joinExistingSession}>Join Session</button>
-                <button onClick={this.handleAddNewPage}>Add New Page</button>
-                <button onClick={this.handleGoPrevPage}>Prev</button>
-                <button onClick={this.handleGoNextPage}>Next</button>
-                <button onClick={this.handleActivePen}>Pen</button>
-                <button onClick={this.handleActiveEraser}>Eraser</button>
-                <button onClick={this.handleUndo}>Undo</button>
-                <button onClick={this.handleRedo}>Redo</button>
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
-                <div id="session-id">{this.state.sessionId}</div>
+                <div id="tool-box">
+                    <button onClick={this.createNewSession}>Start New Session</button>
+                    <input type="text" id="session-id" />
+                    <button onClick={this.joinExistingSession}>Join Session</button>
+                    <button onClick={this.handleAddNewPage}>Add New Page</button>
+                    <button onClick={this.handleGoPrevPage}>Prev</button>
+                    <button onClick={this.handleGoNextPage}>Next</button>
+                    <button onClick={this.handleActivePen}>Pen</button>
+                    <button onClick={this.handleActiveEraser}>Eraser</button>
+                    <button onClick={this.handleUndo}>Undo</button>
+                    <button onClick={this.handleRedo}>Redo</button>
+                    <div id="session-id">{this.state.sessionId}</div>
+                </div>
             </div>
         )
     }
