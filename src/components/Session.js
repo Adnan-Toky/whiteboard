@@ -54,9 +54,10 @@ class Whiteboard {
             updatePointer: props.updatePointer
         }
 
+
+        this.createTempCanvas();
         this.createNewPage();
         this.navigatePage(0);
-        this.createTempCanvas();
         this.connectRTDB();
         this.loadData();
     }
@@ -168,6 +169,16 @@ class Whiteboard {
         }
     }
 
+    reRender() {
+        for (let i = 0; i < this.canvas.ctx.length; i++) {
+            this.canvas.ctx[i].clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+        let indx = this.canvas.currentObject;
+        for (let i = 0; i <= indx; i++) {
+            this.draw(i);
+        }
+    }
+
     redo(indx) {
         this.canvas.undoStackCount--;
         for (let i = 0; i < this.canvas.ctx.length; i++) {
@@ -205,33 +216,33 @@ class Whiteboard {
     draw(indx) {
         if (!this.canvas.dataList[indx]) return;
         while (this.canvas.pages.length <= this.canvas.dataList[indx].page) this.createNewPage();
+
+        let data = this.canvas.dataList[indx];
         if (this.canvas.dataList[indx].o === 0) {
-            let data = this.canvas.dataList[indx];
             this.canvas.ctx[data.page].globalCompositeOperation = "source-over";
             this.canvas.ctx[data.page].beginPath();
             this.canvas.ctx[data.page].lineWidth = 4;
             this.canvas.ctx[data.page].lineJoin = "round";
             this.canvas.ctx[data.page].lineCap = "round";
-            this.canvas.ctx[data.page].moveTo(data.s[0], data.s[1]);
+            this.canvas.ctx[data.page].moveTo(data.s[0] * this.canvas.width / data.w, data.s[1] * this.canvas.height / data.h);
 
             for (let i = 0; i < data.p.length; i++) {
-                this.canvas.ctx[data.page].lineTo(data.p[i][0], data.p[i][1]);
+                this.canvas.ctx[data.page].lineTo(data.p[i][0] * this.canvas.width / data.w, data.p[i][1] * this.canvas.height / data.h);
             }
             this.canvas.ctx[data.page].stroke();
             this.canvas.ctx[data.page].closePath();
             this.canvas.tmpCtx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         }
         else if (this.canvas.dataList[indx].o === 1) {
-            let data = this.canvas.dataList[indx];
             this.canvas.ctx[data.page].globalCompositeOperation = "destination-out";
             this.canvas.ctx[data.page].beginPath();
             this.canvas.ctx[data.page].lineWidth = 20;
             this.canvas.ctx[data.page].lineJoin = "round";
             this.canvas.ctx[data.page].lineCap = "round";
-            this.canvas.ctx[data.page].moveTo(data.s[0], data.s[1]);
+            this.canvas.ctx[data.page].moveTo(data.s[0] * this.canvas.width / data.w, data.s[1] * this.canvas.height / data.h);
 
             for (let i = 0; i < data.p.length; i++) {
-                this.canvas.ctx[data.page].lineTo(data.p[i][0], data.p[i][1]);
+                this.canvas.ctx[data.page].lineTo(data.p[i][0] * this.canvas.width / data.w, data.p[i][1] * this.canvas.height / data.h);
             }
             this.canvas.ctx[data.page].stroke();
             this.canvas.ctx[data.page].closePath();
@@ -251,8 +262,8 @@ class Whiteboard {
 
         if (data.a === 3) {
             this.action.updatePointer({
-                top: data.y,
-                left: data.x,
+                top: this.canvas.tmpPage.offsetTop + y,
+                left: this.canvas.tmpPage.offsetLeft + x,
                 icon: data.o,
                 vis: this.config.role === "editor" ? "none" : "inline-block"
             });
@@ -270,16 +281,16 @@ class Whiteboard {
         else {
             if (data.o === 0) {
                 this.action.updatePointer({
-                    top: data.y - 15,
-                    left: data.x,
+                    top: this.canvas.tmpPage.offsetTop + y - 15,
+                    left: this.canvas.tmpPage.offsetLeft + x,
                     icon: 0,
                     vis: this.config.role === "editor" ? "none" : "inline-block"
                 });
             }
             else if (data.o === 1) {
                 this.action.updatePointer({
-                    top: data.y - 15,
-                    left: data.x,
+                    top: this.canvas.tmpPage.offsetTop + y - 15,
+                    left: this.canvas.tmpPage.offsetLeft + x,
                     icon: 1,
                     vis: this.config.role === "editor" ? "none" : "inline-block"
                 });
@@ -291,6 +302,8 @@ class Whiteboard {
                 // this.canvas.currentObject = data.i; // updating current object index
                 this.canvas.dataList[data.i] = {
                     s: [data.x, data.y],
+                    h: data.h,
+                    w: data.w,
                     o: data.o,
                     page: data.p,
                     p: [],
@@ -302,19 +315,19 @@ class Whiteboard {
                 this.canvas.tmpCtx.lineWidth = 4;
                 this.canvas.tmpCtx.lineJoin = "round";
                 this.canvas.tmpCtx.lineCap = "round";
-                this.canvas.tmpCtx.moveTo(data.x, data.y);
+                this.canvas.tmpCtx.moveTo(x, y);
             }
             else if (data.a === 1) {
                 if (!this.canvas.dataList[data.i]) return;
                 this.canvas.dataList[data.i].p.push([data.x, data.y]);
-                this.canvas.tmpCtx.lineTo(data.x, data.y);
+                this.canvas.tmpCtx.lineTo(x, y);
                 this.canvas.tmpCtx.stroke();
             }
             else if (data.a === 2) {
                 if (!this.canvas.dataList[data.i]) return;
-                this.canvas.dataList[data.i].e.push(data.x);
-                this.canvas.dataList[data.i].e.push(data.y);
-                this.canvas.tmpCtx.moveTo(data.x, data.y);
+                this.canvas.dataList[data.i].e.push(x);
+                this.canvas.dataList[data.i].e.push(y);
+                this.canvas.tmpCtx.moveTo(x, y);
                 this.canvas.tmpCtx.closePath();
                 this.draw(data.i);
             }
@@ -324,6 +337,8 @@ class Whiteboard {
                 this.canvas.currentObject = data.i;
                 this.canvas.dataList[data.i] = {
                     s: [data.x, data.y],
+                    h: data.h,
+                    w: data.w,
                     o: data.o,
                     page: data.p,
                     p: [],
@@ -335,19 +350,19 @@ class Whiteboard {
                 this.canvas.tmpCtx.lineWidth = 20;
                 this.canvas.tmpCtx.lineJoin = "round";
                 this.canvas.tmpCtx.lineCap = "round";
-                this.canvas.tmpCtx.moveTo(data.x, data.y);
+                this.canvas.tmpCtx.moveTo(x, y);
             }
             else if (data.a === 1) {
                 if (!this.canvas.dataList[data.i]) return;
                 this.canvas.dataList[data.i].p.push([data.x, data.y]);
-                this.canvas.tmpCtx.lineTo(data.x, data.y);
+                this.canvas.tmpCtx.lineTo(x, y);
                 this.canvas.tmpCtx.stroke();
             }
             else if (data.a === 2) {
                 if (!this.canvas.dataList[data.i]) return;
                 this.canvas.dataList[data.i].e.push(data.x);
                 this.canvas.dataList[data.i].e.push(data.y);
-                this.canvas.tmpCtx.moveTo(data.x, data.y);
+                this.canvas.tmpCtx.moveTo(x, y);
                 this.canvas.tmpCtx.closePath();
                 this.draw(data.i);
             }
@@ -374,6 +389,7 @@ class Whiteboard {
         this.canvas.ctx.push(canvas.getContext("2d"));
         this.navigatePage(this.canvas.pages.length - 1);
         console.log("added new page");
+        this.setDimensions();
     }
 
     createTempCanvas() {
@@ -409,6 +425,7 @@ class Whiteboard {
         this.canvas.tmpPage.width = canvasWidth;
         this.canvas.tmpPage.style.top = (window.innerHeight - canvasHeight) / 2 + "px";
         this.canvas.tmpPage.style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+        this.reRender();
     }
 }
 
@@ -444,7 +461,8 @@ class Session extends React.Component {
             userId: "",
             loggedIn: false,
             role: "",
-            hostId: ""
+            hostId: "",
+            activeSession: false
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -457,6 +475,7 @@ class Session extends React.Component {
         this.handleChangePointer = this.handleChangePointer.bind(this);
         this.handleUndo = this.handleUndo.bind(this);
         this.handleRedo = this.handleRedo.bind(this);
+        this.handleUpdateDimension = this.handleUpdateDimension.bind(this);
     }
 
     async createNewSession() {
@@ -494,7 +513,9 @@ class Session extends React.Component {
                     container: document.getElementById("canvas-container"),
                     updatePointer: this.handleChangePointer
                 });
-                this.board.setDimensions();
+                this.setState({
+                    activeSession: true
+                });
             }
             catch (e) {
                 console.log("Something went wrong, Err:", e);
@@ -514,10 +535,13 @@ class Session extends React.Component {
             userId: this.state.userId,
             role: "viewer",
             bgColor: "#bbb",
-            height: 500,
-            width: 600,
+            height: 300,
+            width: 500,
             container: document.getElementById("canvas-container"),
             updatePointer: this.handleChangePointer
+        });
+        this.setState({
+            activeSession: true
         });
     }
 
@@ -560,7 +584,14 @@ class Session extends React.Component {
         this.board.handleRedo();
     }
 
+    handleUpdateDimension() {
+        if (this.state.activeSession && this.board) {
+            this.board.setDimensions();
+        }
+    }
+
     componentDidMount() {
+        window.addEventListener('resize', this.handleUpdateDimension);
         signInAnonymously(auth).then(() => {
             console.log("Signed in as:");
             onAuthStateChanged(auth, (user) => {
@@ -582,6 +613,10 @@ class Session extends React.Component {
         }).catch((err) => {
             console.log("Error Login:", err);
         });
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.handleUpdateDimension);
     }
 
     render() {
