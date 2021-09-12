@@ -5,8 +5,10 @@ import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen } from '@fortawesome/free-solid-svg-icons';
-import { faEraser } from '@fortawesome/free-solid-svg-icons';
+import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus, faPlug } from '@fortawesome/free-solid-svg-icons';
+import Tooltip from '@material-ui/core/Tooltip';
+
+
 
 import "./../css/canvas.css";
 
@@ -451,6 +453,8 @@ class Session extends React.Component {
         super(props);
         this.board = null;
 
+        this.toolboxHeight = 322;
+
         this.state = {
             left: 0,
             top: 0,
@@ -462,7 +466,9 @@ class Session extends React.Component {
             loggedIn: false,
             role: "",
             hostId: "",
-            activeSession: false
+            activeSession: false,
+            toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
+            activeTool: "pen"
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -507,7 +513,7 @@ class Session extends React.Component {
                     hostId: this.state.userId,
                     userId: this.state.userId,
                     role: "editor",
-                    bgColor: "#bbb",
+                    bgColor: "#eee",
                     height: 300,
                     width: 500,
                     container: document.getElementById("canvas-container"),
@@ -551,23 +557,31 @@ class Session extends React.Component {
     }
 
     handleGoNextPage() {
-        if (!this.board || this.board.config.role !== "editor") return;
-        this.board.navigatePage(this.board.canvas.activePage + 1);
+        // if (!this.board || this.board.config.role !== "editor" || true) return;
+        if (this.board)
+            this.board.navigatePage(this.board.canvas.activePage + 1);
     }
 
     handleGoPrevPage() {
-        if (!this.board || this.board.config.role !== "editor") return;
-        this.board.navigatePage(this.board.canvas.activePage - 1);
+        // if (!this.board || this.board.config.role !== "editor") return;
+        if (this.board)
+            this.board.navigatePage(this.board.canvas.activePage - 1);
     }
 
     handleActivePen() {
         if (!this.board || this.board.config.role !== "editor") return;
         this.board.changeActiveObject(0);
+        this.setState({
+            activeTool: "pen"
+        })
     }
 
     handleActiveEraser() {
         if (!this.board || this.board.config.role !== "editor") return;
         this.board.changeActiveObject(1);
+        this.setState({
+            activeTool: "eraser"
+        })
     }
 
     handleChangePointer(obj) {
@@ -588,6 +602,9 @@ class Session extends React.Component {
         if (this.state.activeSession && this.board) {
             this.board.setDimensions();
         }
+        this.setState({
+            toolboxTop: (window.innerHeight - this.toolboxHeight) / 2
+        });
     }
 
     componentDidMount() {
@@ -624,18 +641,111 @@ class Session extends React.Component {
             <div>
                 <div id="canvas-container"></div>
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
-                <div id="tool-box">
+                <div className="session-box">
                     <button onClick={this.createNewSession}>Start New Session</button>
                     <input type="text" id="session-id" />
                     <button onClick={this.joinExistingSession}>Join Session</button>
-                    <button onClick={this.handleAddNewPage}>Add New Page</button>
-                    <button onClick={this.handleGoPrevPage}>Prev</button>
-                    <button onClick={this.handleGoNextPage}>Next</button>
-                    <button onClick={this.handleActivePen}>Pen</button>
-                    <button onClick={this.handleActiveEraser}>Eraser</button>
-                    <button onClick={this.handleUndo}>Undo</button>
-                    <button onClick={this.handleRedo}>Redo</button>
                     <div id="session-id">{this.state.sessionId}</div>
+                </div>
+                <div className="tool-box-area" style={{
+                    top: this.state.toolboxTop
+                }}>
+                    <div className="tool-box">
+                        <div>
+                            <Tooltip title="Add New Page" placement="right" arrow>
+                                <div className="tool-item" onClick={this.handleAddNewPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faPlus} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Previous Page" placement="right" arrow>
+                                <div className="tool-item" onClick={this.handleGoPrevPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faChevronLeft} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Next Page" placement="right" arrow>
+                                <div className="tool-item" onClick={this.handleGoNextPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faChevronRight} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Brush" placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool == "pen" ? "active-tool" : "")} onClick={this.handleActivePen}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faPen} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Eraser" placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool == "eraser" ? "active-tool" : "")} onClick={this.handleActiveEraser}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faEraser} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Undo" placement="right" arrow>
+                                <div className="tool-item" onClick={this.handleUndo}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faUndo} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Redo" placement="right" arrow>
+                                <div className="tool-item" onClick={this.handleRedo}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faRedo} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                    </div>
+                </div>
+                <div className="page-control-area">
+                    <div className="page-btn">
+                        <div>
+                            <Tooltip title="Previous Page" placement="top" arrow>
+                                <div className="page-control-item" onClick={this.handleGoPrevPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faChevronLeft} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Add New Page" placement="top" arrow>
+                                <div className="page-control-item" onClick={this.handleAddNewPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faPlus} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title="Next Page" placement="top" arrow>
+                                <div className="page-control-item" onClick={this.handleGoNextPage}>
+                                    <div className="tool-item-icon">
+                                        <FontAwesomeIcon icon={faChevronRight} />
+                                    </div>
+                                </div>
+                            </Tooltip>
+                        </div>
+                    </div>
                 </div>
             </div>
         )

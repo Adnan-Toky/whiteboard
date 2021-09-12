@@ -1,3 +1,9 @@
+body {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
 .tmp-canvas {
     position: fixed;
     /* top: 0;
@@ -17,10 +23,85 @@
 #canvas-container {
     height: 100vh;
     width: 100vw;
+    z-index: 100;
 }
 
-#tool-box {
+.tool-box-area {
     position: fixed;
-    bottom: 0;
-    z-index: 110;
+    left: 8px;
+    z-index: 1110;
+    width: 46px;
+    top: 46px;
+    user-select: none;
+    background-color: #fff;
+}
+
+.tool-box {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+    box-shadow: 0px 0px 10px #ccc;
+    border-radius: 5px;
+    overflow: hidden;
+    /* background-color: rgb(230, 230, 230); */
+}
+
+.tool-item {
+    width: 46px;
+    height: 46px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+}
+
+.tool-item:hover {
+    background-color: #ccc;
+}
+
+.tool-item-icon {
+    width: 100%;
+    font-size: 20px;
+}
+
+.active-tool {
+    background-color: #ddd;
+}
+
+.session-box {
+    position: fixed;
+    top: 0;
+    left: 0;
+}
+
+.page-control-area {
+    position: fixed;
+    z-index: 1000;
+    bottom: 20px;
+    right: 20px;
+}
+
+.page-btn {
+    display: flex;
+    justify-content: center;
+    flex-direction: row;
+    box-shadow: 0px 0px 10px #bbb;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: #fff;
+}
+
+.page-control-item {
+    width: 40px;
+    height: 40px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+}
+
+.page-control-item:hover {
+    background-color: #eee;
 }
