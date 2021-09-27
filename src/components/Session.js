@@ -7,6 +7,8 @@ import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus, faPlug } from '@fortawesome/free-solid-svg-icons';
 import Tooltip from '@material-ui/core/Tooltip';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Box from '@mui/material/Box';
 
 
 
@@ -50,7 +52,9 @@ class Whiteboard {
             width: props.width,
             container: props.container,
             drawing: false,
-            undoStackCount: 0
+            undoStackCount: 0,
+            activeLineWidth: 0.6,
+            activeLineColor: "red"
         };
         this.action = {
             updatePointer: props.updatePointer
@@ -67,6 +71,10 @@ class Whiteboard {
     changeActiveObject(objectCode) {
         if (this.canvas.activeObject === objectCode) return;
         this.canvas.activeObject = objectCode;
+    }
+
+    changeLineColor(color) {
+        this.canvas.activeLineColor = color;
     }
 
     connectRTDB() {
@@ -126,7 +134,9 @@ class Whiteboard {
             a: 0,
             p: this.canvas.activePage,
             o: this.canvas.activeObject,
-            i: this.canvas.currentObject
+            i: this.canvas.currentObject,
+            l: this.canvas.activeLineWidth,
+            c: this.canvas.activeLineColor
         });
     }
 
@@ -223,7 +233,8 @@ class Whiteboard {
         if (this.canvas.dataList[indx].o === 0) {
             this.canvas.ctx[data.page].globalCompositeOperation = "source-over";
             this.canvas.ctx[data.page].beginPath();
-            this.canvas.ctx[data.page].lineWidth = 4;
+            this.canvas.ctx[data.page].strokeStyle = data.c;
+            this.canvas.ctx[data.page].lineWidth = parseInt(data.l * this.canvas.width / 100);
             this.canvas.ctx[data.page].lineJoin = "round";
             this.canvas.ctx[data.page].lineCap = "round";
             this.canvas.ctx[data.page].moveTo(data.s[0] * this.canvas.width / data.w, data.s[1] * this.canvas.height / data.h);
@@ -309,12 +320,14 @@ class Whiteboard {
                     o: data.o,
                     page: data.p,
                     p: [],
-                    e: []
+                    e: [],
+                    l: data.l,
+                    c: data.c
                 };
 
-                this.canvas.tmpCtx.strokeStyle = "#000";
+                this.canvas.tmpCtx.strokeStyle = data.c;
                 this.canvas.tmpCtx.beginPath();
-                this.canvas.tmpCtx.lineWidth = 4;
+                this.canvas.tmpCtx.lineWidth = parseInt(data.l * this.canvas.width / 100);
                 this.canvas.tmpCtx.lineJoin = "round";
                 this.canvas.tmpCtx.lineCap = "round";
                 this.canvas.tmpCtx.moveTo(x, y);
@@ -411,12 +424,12 @@ class Whiteboard {
     setDimensions() {
         let canvasWidth = window.innerWidth;
         let canvasHeight = window.innerWidth * this.canvas.height / this.canvas.width;
-        this.canvas.height = canvasHeight;
-        this.canvas.width = canvasWidth;
         if (window.innerWidth * this.canvas.height > this.canvas.width * window.innerHeight) {
             canvasHeight = window.innerHeight;
             canvasWidth = window.innerHeight * this.canvas.width / this.canvas.height;
         }
+        this.canvas.height = canvasHeight;
+        this.canvas.width = canvasWidth;
         for (let i = 0; i < this.canvas.pages.length; i++) {
             this.canvas.pages[i].height = canvasHeight;
             this.canvas.pages[i].width = canvasWidth;
@@ -427,6 +440,7 @@ class Whiteboard {
         this.canvas.tmpPage.width = canvasWidth;
         this.canvas.tmpPage.style.top = (window.innerHeight - canvasHeight) / 2 + "px";
         this.canvas.tmpPage.style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+        console.log(this.canvas.height / this.canvas.width, "*****");
         this.reRender();
     }
 }
@@ -468,7 +482,8 @@ class Session extends React.Component {
             hostId: "",
             activeSession: false,
             toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
-            activeTool: "pen"
+            activeTool: "pen",
+            penToolBox: false
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -482,6 +497,9 @@ class Session extends React.Component {
         this.handleUndo = this.handleUndo.bind(this);
         this.handleRedo = this.handleRedo.bind(this);
         this.handleUpdateDimension = this.handleUpdateDimension.bind(this);
+        this.handleTogglePenToolBox = this.handleTogglePenToolBox.bind(this);
+        this.handleClosePenToolBox = this.handleClosePenToolBox.bind(this);
+        this.handleChaneLineColor = this.handleChaneLineColor.bind(this);
     }
 
     async createNewSession() {
@@ -598,6 +616,11 @@ class Session extends React.Component {
         this.board.handleRedo();
     }
 
+    handleChaneLineColor(color) {
+        if (!this.board || this.board.config.role !== "editor") return;
+        this.board.changeLineColor(color);
+    }
+
     handleUpdateDimension() {
         if (this.state.activeSession && this.board) {
             this.board.setDimensions();
@@ -634,6 +657,20 @@ class Session extends React.Component {
 
     componentWillUnmount() {
         window.removeEventListener('resize', this.handleUpdateDimension);
+    }
+
+    handleTogglePenToolBox() {
+        if (this.state.activeTool !== "pen") return;
+        this.setState({
+            penToolBox: true
+        });
+    }
+
+    handleClosePenToolBox() {
+        console.log(1);
+        this.setState({
+            penToolBox: false
+        })
     }
 
     render() {
@@ -679,11 +716,22 @@ class Session extends React.Component {
                             </Tooltip>
                         </div>
                         <div>
-                            <Tooltip title="Brush" placement="right" arrow>
+                            <Tooltip title={this.state.penToolBox ? "" : "Brush"} placement="right" arrow>
                                 <div className={"tool-item " + (this.state.activeTool == "pen" ? "active-tool" : "")} onClick={this.handleActivePen}>
-                                    <div className="tool-item-icon">
-                                        <FontAwesomeIcon icon={faPen} />
-                                    </div>
+                                    <ClickAwayListener onClickAway={this.handleClosePenToolBox}>
+                                        <div className="tool-item">
+                                            <div className="tool-item-icon" onClick={this.handleTogglePenToolBox}>
+                                                <FontAwesomeIcon icon={faPen} />
+                                            </div>
+                                            {this.state.penToolBox ? (
+                                                <div className="tool-box-menu">
+                                                    <button onClick={() => { this.handleChaneLineColor("red") }}>red</button>
+                                                    <button onClick={() => { this.handleChaneLineColor("blue") }}>blue</button>
+                                                    <button onClick={() => { this.handleChaneLineColor("black") }}>black</button>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </ClickAwayListener>
                                 </div>
                             </Tooltip>
                         </div>
