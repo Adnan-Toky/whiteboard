@@ -5,10 +5,9 @@ import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus, faPlug } from '@fortawesome/free-solid-svg-icons';
+import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Tooltip from '@material-ui/core/Tooltip';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
-import Box from '@mui/material/Box';
 
 
 
@@ -461,6 +460,37 @@ class Pointer extends React.Component {
     }
 }
 
+function PenToolBox(props) {
+    return (
+        <div className="tool-box-menu">
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#000000"); }} style={{
+                backgroundColor: "#000000"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#e71224"); }} style={{
+                backgroundColor: "#e71224"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#19acc0"); }} style={{
+                backgroundColor: "#19acc0"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#2bb335"); }} style={{
+                backgroundColor: "#2bb335"
+            }}></button>
+
+            <br />
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#ffffff"); }} style={{
+                backgroundColor: "#e5e5e5"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#ffc114"); }} style={{
+                backgroundColor: "#ffc114"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#5b2d90"); }} style={{
+                backgroundColor: "#5b2d90"
+            }}></button>
+            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#d20078"); }} style={{
+                backgroundColor: "#d20078"
+            }}></button>
+        </div>);
+}
 
 class Session extends React.Component {
     constructor(props) {
@@ -482,8 +512,15 @@ class Session extends React.Component {
             hostId: "",
             activeSession: false,
             toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
-            activeTool: "pen",
-            penToolBox: false
+            activeTool: "pen2",
+            penToolBox1: false,
+            penToolBox2: false,
+            penToolBox3: false,
+            penToolBox4: false,
+            pen1Color: "#000000",
+            pen2Color: "#e71224",
+            pen3Color: "#2bb335",
+            pen4Color: "#ffc114",
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -499,7 +536,8 @@ class Session extends React.Component {
         this.handleUpdateDimension = this.handleUpdateDimension.bind(this);
         this.handleTogglePenToolBox = this.handleTogglePenToolBox.bind(this);
         this.handleClosePenToolBox = this.handleClosePenToolBox.bind(this);
-        this.handleChaneLineColor = this.handleChaneLineColor.bind(this);
+        this.handleChangeLineColor = this.handleChangeLineColor.bind(this);
+        this.handleChangePenColor = this.handleChangePenColor.bind(this);
     }
 
     async createNewSession() {
@@ -586,12 +624,13 @@ class Session extends React.Component {
             this.board.navigatePage(this.board.canvas.activePage - 1);
     }
 
-    handleActivePen() {
+    handleActivePen(indx) {
         if (!this.board || this.board.config.role !== "editor") return;
         this.board.changeActiveObject(0);
         this.setState({
-            activeTool: "pen"
-        })
+            activeTool: "pen" + indx
+        });
+        this.handleChangeLineColor(this.state["pen" + indx + "Color"]);
     }
 
     handleActiveEraser() {
@@ -616,7 +655,7 @@ class Session extends React.Component {
         this.board.handleRedo();
     }
 
-    handleChaneLineColor(color) {
+    handleChangeLineColor(color) {
         if (!this.board || this.board.config.role !== "editor") return;
         this.board.changeLineColor(color);
     }
@@ -659,18 +698,26 @@ class Session extends React.Component {
         window.removeEventListener('resize', this.handleUpdateDimension);
     }
 
-    handleTogglePenToolBox() {
-        if (this.state.activeTool !== "pen") return;
-        this.setState({
-            penToolBox: true
-        });
+    handleTogglePenToolBox(indx) {
+        if (this.state.activeTool !== "pen" + indx) return;
+        let obj = {};
+        obj["penToolBox" + indx] = !this.state["penToolBox" + indx];
+        this.setState(obj);
     }
 
-    handleClosePenToolBox() {
-        console.log(1);
-        this.setState({
-            penToolBox: false
-        })
+    handleClosePenToolBox(indx) {
+        let obj = {};
+        obj["penToolBox" + indx] = false;
+        this.setState(obj);
+    }
+
+    handleChangePenColor(indx, color) {
+        let obj = {};
+        obj["pen" + indx + "Color"] = color;
+        this.setState(obj, () => {
+            this.handleChangeLineColor(color);
+        });
+
     }
 
     render() {
@@ -689,46 +736,79 @@ class Session extends React.Component {
                 }}>
                     <div className="tool-box">
                         <div>
-                            <Tooltip title="Add New Page" placement="right" arrow>
-                                <div className="tool-item" onClick={this.handleAddNewPage}>
-                                    <div className="tool-item-icon">
-                                        <FontAwesomeIcon icon={faPlus} />
-                                    </div>
-                                </div>
-                            </Tooltip>
-                        </div>
-                        <div>
-                            <Tooltip title="Previous Page" placement="right" arrow>
-                                <div className="tool-item" onClick={this.handleGoPrevPage}>
-                                    <div className="tool-item-icon">
-                                        <FontAwesomeIcon icon={faChevronLeft} />
-                                    </div>
-                                </div>
-                            </Tooltip>
-                        </div>
-                        <div>
-                            <Tooltip title="Next Page" placement="right" arrow>
-                                <div className="tool-item" onClick={this.handleGoNextPage}>
-                                    <div className="tool-item-icon">
-                                        <FontAwesomeIcon icon={faChevronRight} />
-                                    </div>
-                                </div>
-                            </Tooltip>
-                        </div>
-                        <div>
-                            <Tooltip title={this.state.penToolBox ? "" : "Brush"} placement="right" arrow>
-                                <div className={"tool-item " + (this.state.activeTool == "pen" ? "active-tool" : "")} onClick={this.handleActivePen}>
-                                    <ClickAwayListener onClickAway={this.handleClosePenToolBox}>
+                            <Tooltip title={this.state.penToolBox1 ? "" : "Brush"} placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool === "pen1" ? "active-tool" : "")} onClick={() => this.handleActivePen(1)}>
+                                    <ClickAwayListener onClickAway={() => this.handleClosePenToolBox(1)}>
                                         <div className="tool-item">
-                                            <div className="tool-item-icon" onClick={this.handleTogglePenToolBox}>
-                                                <FontAwesomeIcon icon={faPen} />
-                                            </div>
-                                            {this.state.penToolBox ? (
-                                                <div className="tool-box-menu">
-                                                    <button onClick={() => { this.handleChaneLineColor("red") }}>red</button>
-                                                    <button onClick={() => { this.handleChaneLineColor("blue") }}>blue</button>
-                                                    <button onClick={() => { this.handleChaneLineColor("black") }}>black</button>
+                                            <div className="tool-item" onClick={() => this.handleTogglePenToolBox(1)}>
+                                                <div className="tool-item-icon">
+                                                    <FontAwesomeIcon icon={faPen} style={{
+                                                        color: this.state.pen1Color
+                                                    }} />
                                                 </div>
+                                            </div>
+                                            {this.state.penToolBox1 ? (
+                                                <PenToolBox indx={1} handleChangePenColor={this.handleChangePenColor} />
+                                            ) : null}
+                                        </div>
+                                    </ClickAwayListener>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title={this.state.penToolBox2 ? "" : "Brush"} placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool === "pen2" ? "active-tool" : "")} onClick={() => this.handleActivePen(2)}>
+                                    <ClickAwayListener onClickAway={() => this.handleClosePenToolBox(2)}>
+                                        <div className="tool-item">
+                                            <div className="tool-item" onClick={() => this.handleTogglePenToolBox(2)}>
+                                                <div className="tool-item-icon">
+                                                    <FontAwesomeIcon icon={faPen} style={{
+                                                        color: this.state.pen2Color
+                                                    }} />
+                                                </div>
+                                            </div>
+                                            {this.state.penToolBox2 ? (
+                                                <PenToolBox indx={2} handleChangePenColor={this.handleChangePenColor} />
+                                            ) : null}
+                                        </div>
+                                    </ClickAwayListener>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title={this.state.penToolBox3 ? "" : "Brush"} placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool === "pen3" ? "active-tool" : "")} onClick={() => this.handleActivePen(3)}>
+                                    <ClickAwayListener onClickAway={() => this.handleClosePenToolBox(3)}>
+                                        <div className="tool-item">
+                                            <div className="tool-item" onClick={() => this.handleTogglePenToolBox(3)}>
+                                                <div className="tool-item-icon">
+                                                    <FontAwesomeIcon icon={faPen} style={{
+                                                        color: this.state.pen3Color
+                                                    }} />
+                                                </div>
+                                            </div>
+                                            {this.state.penToolBox3 ? (
+                                                <PenToolBox indx={3} handleChangePenColor={this.handleChangePenColor} />
+                                            ) : null}
+                                        </div>
+                                    </ClickAwayListener>
+                                </div>
+                            </Tooltip>
+                        </div>
+                        <div>
+                            <Tooltip title={this.state.penToolBox4 ? "" : "Brush"} placement="right" arrow>
+                                <div className={"tool-item " + (this.state.activeTool === "pen4" ? "active-tool" : "")} onClick={() => this.handleActivePen(4)}>
+                                    <ClickAwayListener onClickAway={() => this.handleClosePenToolBox(4)}>
+                                        <div className="tool-item">
+                                            <div className="tool-item" onClick={() => this.handleTogglePenToolBox(4)}>
+                                                <div className="tool-item-icon">
+                                                    <FontAwesomeIcon icon={faPen} style={{
+                                                        color: this.state.pen4Color
+                                                    }} />
+                                                </div>
+                                            </div>
+                                            {this.state.penToolBox4 ? (
+                                                <PenToolBox indx={4} handleChangePenColor={this.handleChangePenColor} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -737,7 +817,7 @@ class Session extends React.Component {
                         </div>
                         <div>
                             <Tooltip title="Eraser" placement="right" arrow>
-                                <div className={"tool-item " + (this.state.activeTool == "eraser" ? "active-tool" : "")} onClick={this.handleActiveEraser}>
+                                <div className={"tool-item " + (this.state.activeTool === "eraser" ? "active-tool" : "")} onClick={this.handleActiveEraser}>
                                     <div className="tool-item-icon">
                                         <FontAwesomeIcon icon={faEraser} />
                                     </div>
