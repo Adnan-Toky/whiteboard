@@ -8,7 +8,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus } from '@fortawesome/free-solid-svg-icons';
 import Tooltip from '@material-ui/core/Tooltip';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
-
+import Button from '@mui/material/Button';
+import ColorizeIcon from '@mui/icons-material/Colorize';
+import PrettoSlider from './MUSlider';
 
 
 import "./../css/canvas.css";
@@ -52,8 +54,8 @@ class Whiteboard {
             container: props.container,
             drawing: false,
             undoStackCount: 0,
-            activeLineWidth: 0.6,
-            activeLineColor: "red"
+            activeLineWidth: props.lineWidth * 100 / props.width,
+            activeLineColor: props.lineColor
         };
         this.action = {
             updatePointer: props.updatePointer
@@ -74,6 +76,10 @@ class Whiteboard {
 
     changeLineColor(color) {
         this.canvas.activeLineColor = color;
+    }
+
+    changeLineWidth(size) {
+        this.canvas.activeLineWidth = size * 100 / this.canvas.width;
     }
 
     connectRTDB() {
@@ -421,6 +427,7 @@ class Whiteboard {
     }
 
     setDimensions() {
+        let lineWidth = this.canvas.activeLineWidth * this.canvas.width / 100;
         let canvasWidth = window.innerWidth;
         let canvasHeight = window.innerWidth * this.canvas.height / this.canvas.width;
         if (window.innerWidth * this.canvas.height > this.canvas.width * window.innerHeight) {
@@ -429,6 +436,7 @@ class Whiteboard {
         }
         this.canvas.height = canvasHeight;
         this.canvas.width = canvasWidth;
+        this.canvas.activeLineWidth = lineWidth * 100 / canvasWidth;
         for (let i = 0; i < this.canvas.pages.length; i++) {
             this.canvas.pages[i].height = canvasHeight;
             this.canvas.pages[i].width = canvasWidth;
@@ -463,32 +471,73 @@ class Pointer extends React.Component {
 function PenToolBox(props) {
     return (
         <div className="tool-box-menu">
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#000000"); }} style={{
+            <div className="tool-title">Color<span style={{
+                display: "inline-block",
+                position: "absolute",
+                right: 20,
+                fontWeight: 900,
+                color: props.activeColor
+            }}>{props.activeColor}</span></div>
+            <button className={"color-btn" + (props.activeColor === "#000000" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#000000"); }} style={{
                 backgroundColor: "#000000"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#e71224"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#e71224" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#e71224"); }} style={{
                 backgroundColor: "#e71224"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#19acc0"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#19acc0" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#19acc0"); }} style={{
                 backgroundColor: "#19acc0"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#2bb335"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#2bb335" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#2bb335"); }} style={{
                 backgroundColor: "#2bb335"
             }}></button>
 
             <br />
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#ffffff"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#ffffff" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#ffffff"); }} style={{
                 backgroundColor: "#e5e5e5"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#ffc114"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#ffc114" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#ffc114"); }} style={{
                 backgroundColor: "#ffc114"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#5b2d90"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#5b2d90" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#5b2d90"); }} style={{
                 backgroundColor: "#5b2d90"
             }}></button>
-            <button className="color-btn" onClick={() => { props.handleChangePenColor(props.indx, "#d20078"); }} style={{
+            <button className={"color-btn" + (props.activeColor === "#d20078" ? " color-btn-active" : "")} onClick={() => { props.handleChangePenColor(props.indx, "#d20078"); }} style={{
                 backgroundColor: "#d20078"
             }}></button>
+            <br />
+
+            <div style={{
+                marginTop: 10
+            }}>
+                <Button variant="outlined" color="primary" startIcon={<ColorizeIcon />} style={{
+                    fontSize: 13
+                }}>
+                    Custom Color
+                </Button>
+            </div>
+            <div className="tool-title" style={{
+                marginTop: 20,
+                fontSize: 15
+            }}>Size<span style={{
+                display: "inline-block",
+                position: "absolute",
+                right: 20,
+                fontWeight: 900
+            }}>{props.activeSize}</span></div>
+            <div style={{
+                margin: "5px 20px"
+            }}>
+                <PrettoSlider
+                    valueLabelDisplay="auto"
+                    aria-label="pretto slider"
+                    value={props.activeSize}
+                    max={30}
+                    min={1}
+                    onChange={(event, newVal) => {
+                        props.handleChangePenSize(props.indx, newVal);
+                    }}
+                />
+            </div>
         </div>);
 }
 
@@ -512,7 +561,7 @@ class Session extends React.Component {
             hostId: "",
             activeSession: false,
             toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
-            activeTool: "pen2",
+            activeTool: "pen1",
             penToolBox1: false,
             penToolBox2: false,
             penToolBox3: false,
@@ -521,6 +570,10 @@ class Session extends React.Component {
             pen2Color: "#e71224",
             pen3Color: "#2bb335",
             pen4Color: "#ffc114",
+            pen1Size: 5,
+            pen2Size: 5,
+            pen3Size: 5,
+            pen4Size: 5
         }
 
         this.createNewSession = this.createNewSession.bind(this);
@@ -537,7 +590,9 @@ class Session extends React.Component {
         this.handleTogglePenToolBox = this.handleTogglePenToolBox.bind(this);
         this.handleClosePenToolBox = this.handleClosePenToolBox.bind(this);
         this.handleChangeLineColor = this.handleChangeLineColor.bind(this);
+        this.handleChangeLineSize = this.handleChangeLineSize.bind(this);
         this.handleChangePenColor = this.handleChangePenColor.bind(this);
+        this.handleChangePenSize = this.handleChangePenSize.bind(this);
     }
 
     async createNewSession() {
@@ -572,6 +627,8 @@ class Session extends React.Component {
                     bgColor: "#eee",
                     height: 300,
                     width: 500,
+                    lineColor: this.state[this.state.activeTool + "Color"],
+                    lineWidth: this.state[this.state.activeTool + "Size"],
                     container: document.getElementById("canvas-container"),
                     updatePointer: this.handleChangePointer
                 });
@@ -631,6 +688,7 @@ class Session extends React.Component {
             activeTool: "pen" + indx
         });
         this.handleChangeLineColor(this.state["pen" + indx + "Color"]);
+        this.handleChangeLineSize(this.state["pen" + indx + "Size"]);
     }
 
     handleActiveEraser() {
@@ -658,6 +716,11 @@ class Session extends React.Component {
     handleChangeLineColor(color) {
         if (!this.board || this.board.config.role !== "editor") return;
         this.board.changeLineColor(color);
+    }
+
+    handleChangeLineSize(size) {
+        if (!this.board || this.board.config.role !== "editor") return;
+        this.board.changeLineWidth(size);
     }
 
     handleUpdateDimension() {
@@ -717,7 +780,14 @@ class Session extends React.Component {
         this.setState(obj, () => {
             this.handleChangeLineColor(color);
         });
+    }
 
+    handleChangePenSize(indx, size) {
+        let obj = {};
+        obj["pen" + indx + "Size"] = size;
+        this.setState(obj, () => {
+            this.handleChangeLineSize(size);
+        });
     }
 
     render() {
@@ -748,7 +818,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox1 ? (
-                                                <PenToolBox indx={1} handleChangePenColor={this.handleChangePenColor} />
+                                                <PenToolBox indx={1} activeColor={this.state.pen1Color} activeSize={this.state.pen1Size} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -768,7 +838,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox2 ? (
-                                                <PenToolBox indx={2} handleChangePenColor={this.handleChangePenColor} />
+                                                <PenToolBox indx={2} activeColor={this.state.pen2Color} activeSize={this.state.pen2Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -788,7 +858,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox3 ? (
-                                                <PenToolBox indx={3} handleChangePenColor={this.handleChangePenColor} />
+                                                <PenToolBox indx={3} activeColor={this.state.pen3Color} activeSize={this.state.pen3Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -808,7 +878,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox4 ? (
-                                                <PenToolBox indx={4} handleChangePenColor={this.handleChangePenColor} />
+                                                <PenToolBox indx={4} activeColor={this.state.pen4Color} activeSize={this.state.pen4Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
