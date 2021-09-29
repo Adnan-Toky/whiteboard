@@ -11,6 +11,7 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import Button from '@mui/material/Button';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import PrettoSlider from './MUSlider';
+import ColorPopup from "./ColorPicker";
 
 
 import "./../css/canvas.css";
@@ -469,6 +470,18 @@ class Pointer extends React.Component {
 }
 
 function PenToolBox(props) {
+    // color picker
+    const [open, setOpen] = React.useState(false);
+
+    const handleClose = () => {
+        setOpen(false);
+    }
+    // color picker
+
+    const handlePick = (color) => {
+        props.handleChangePenColor(props.indx, color);
+    }
+
     return (
         <div className="tool-box-menu">
             <div className="tool-title">Color<span style={{
@@ -509,11 +522,12 @@ function PenToolBox(props) {
             <div style={{
                 marginTop: 10
             }}>
-                <Button variant="outlined" color="primary" startIcon={<ColorizeIcon />} style={{
+                <Button onClick={() => { setOpen(true) }} variant="outlined" color="primary" startIcon={<ColorizeIcon />} style={{
                     fontSize: 13
                 }}>
                     Custom Color
                 </Button>
+                <ColorPopup open={open} handleClose={handleClose} handlePick={handlePick} />
             </div>
             <div className="tool-title" style={{
                 marginTop: 20,
@@ -567,7 +581,7 @@ class Session extends React.Component {
             penToolBox3: false,
             penToolBox4: false,
             pen1Color: "#000000",
-            pen2Color: "#e71224",
+            pen2Color: "#5b2d90",
             pen3Color: "#2bb335",
             pen4Color: "#ffc114",
             pen1Size: 5,
@@ -653,7 +667,7 @@ class Session extends React.Component {
             hostId: "",
             userId: this.state.userId,
             role: "viewer",
-            bgColor: "#bbb",
+            bgColor: "#eee",
             height: 300,
             width: 500,
             container: document.getElementById("canvas-container"),
