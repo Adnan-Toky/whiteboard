@@ -1,7 +1,7 @@
 import React from 'react';
 import { initializeApp } from '@firebase/app';
 import { getFirestore } from "firebase/firestore";
-import { collection, doc, addDoc, setDoc, getDocs } from "firebase/firestore";
+import { collection, doc, addDoc, setDoc, getDocs, getDoc, query, where } from "firebase/firestore";
 import { getDatabase, ref, set, onValue } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -12,6 +12,9 @@ import Button from '@mui/material/Button';
 import ColorizeIcon from '@mui/icons-material/Colorize';
 import PrettoSlider from './MUSlider';
 import ColorPopup from "./ColorPicker";
+import ShareDialog from './ShareDialog';
+import RandomCodeGenerator from './RandomIdGenerator';
+import TextField from '@mui/material/TextField';
 
 
 import "./../css/canvas.css";
@@ -109,7 +112,7 @@ class Whiteboard {
                 for (let i = 0; i <= this.canvas.currentObject; i++) {
                     this.draw(i);
                 }
-                console.log(this.canvas.currentObject);
+                // console.log(this.canvas.currentObject);
                 clearInterval(intv);
             }
         }).bind(this), 100);
@@ -421,10 +424,15 @@ class Whiteboard {
         this.canvas.container.appendChild(canvas);
         this.canvas.tmpCtx = canvas.getContext("2d");
         this.canvas.tmpPage = canvas;
-        canvas.addEventListener("mousedown", this.mouseDownListener.bind(this));
-        canvas.addEventListener("mousemove", this.mouseMoveListener.bind(this));
-        canvas.addEventListener("mouseup", this.mouseUpListener.bind(this));
-        canvas.addEventListener("mouseout", this.mouseUpListener.bind(this));
+        this.canvas.tmpPage.style.touchAction = "none";
+        canvas.addEventListener("pointerdown", this.mouseDownListener.bind(this));
+        canvas.addEventListener("pointermove", this.mouseMoveListener.bind(this));
+        canvas.addEventListener("pointerup", this.mouseUpListener.bind(this));
+        canvas.addEventListener("pointerout", this.mouseUpListener.bind(this));
+        // canvas.addEventListener("mousedown", this.mouseDownListener.bind(this));
+        // canvas.addEventListener("mousemove", this.mouseMoveListener.bind(this));
+        // canvas.addEventListener("mouseup", this.mouseUpListener.bind(this));
+        // canvas.addEventListener("mouseout", this.mouseUpListener.bind(this));
     }
 
     setDimensions() {
@@ -448,7 +456,6 @@ class Whiteboard {
         this.canvas.tmpPage.width = canvasWidth;
         this.canvas.tmpPage.style.top = (window.innerHeight - canvasHeight) / 2 + "px";
         this.canvas.tmpPage.style.left = (window.innerWidth - canvasWidth) / 2 + "px";
-        console.log(this.canvas.height / this.canvas.width, "*****");
         this.reRender();
     }
 }
@@ -613,17 +620,40 @@ class Session extends React.Component {
         if (!this.state.loggedIn) return;
         console.log("Starting New Session");
         try {
+            let session_code = RandomCodeGenerator(6);
+            while (true) {
+                let code = RandomCodeGenerator(6);
+                const q = query(collection(db, "session_details"), where("code", "==", code));
+                const querySnapshot = await getDocs(q);
+                let count = 0;
+                querySnapshot.forEach((doc) => {
+                    // console.log(doc.id, " => ", doc.data());
+                    count++;
+                });
+                session_code = code;
+                if (count == 0) break;
+            }
+
             const ref = await addDoc(collection(db, "sessions"), {
                 host: this.state.userId,
                 participants: [this.state.userId],
                 pageCount: 1,
                 objectCount: 0,
                 width: window.innerWidth,
-                height: window.innerHeight
+                height: window.innerHeight,
+                code: session_code
             });
+            const ref_details = await addDoc(collection(db, "session_details"), {
+                code: session_code,
+                id: ref.id
+            });
+
             console.log("Session Stublished with ID: ", ref.id);
+            console.log("Session Stublished with Code: ", session_code);
+
             this.setState({
                 sessionId: ref.id,
+                sessionCode: session_code,
                 role: "editor",
                 hostId: this.state.userId
             });
@@ -638,9 +668,9 @@ class Session extends React.Component {
                     hostId: this.state.userId,
                     userId: this.state.userId,
                     role: "editor",
-                    bgColor: "#eee",
-                    height: 300,
-                    width: 500,
+                    bgColor: "#f2f3f5",
+                    height: window.innerHeight,
+                    width: window.innerWidth,
                     lineColor: this.state[this.state.activeTool + "Color"],
                     lineWidth: this.state[this.state.activeTool + "Size"],
                     container: document.getElementById("canvas-container"),
@@ -661,21 +691,47 @@ class Session extends React.Component {
 
     async joinExistingSession() {
         // this.board = new Whiteboard(document.getElementById("canvas-container"), "viewer", document.getElementById("session-id").value, "#999", this.handleChangePointer);
-        this.board = new Whiteboard({
-            sessionId: document.getElementById("session-id").value,
-            sessionPassword: "",
-            hostId: "",
-            userId: this.state.userId,
-            role: "viewer",
-            bgColor: "#eee",
-            height: 300,
-            width: 500,
-            container: document.getElementById("canvas-container"),
-            updatePointer: this.handleChangePointer
+        let sessionCode = document.getElementById("session-code").value;
+        sessionCode = (sessionCode.trim()).toUpperCase();
+
+        const q = query(collection(db, "session_details"), where("code", "==", sessionCode));
+        const querySnapshot = await getDocs(q);
+        let sessionId = undefined;
+        querySnapshot.forEach((doc) => {
+            sessionId = doc.data().id;
         });
-        this.setState({
-            activeSession: true
-        });
+
+        if (!sessionId) {
+            console.log("Invalid Session Id");
+            alert("Invalid Session Id");
+            return;
+        }
+
+        const ref = doc(db, "sessions", sessionId);
+        const docSnap = await getDoc(ref);
+
+        if (docSnap.exists()) {
+            let data = docSnap.data();
+            this.board = new Whiteboard({
+                sessionId: sessionId,
+                sessionPassword: "",
+                hostId: "",
+                userId: this.state.userId,
+                role: "viewer",
+                bgColor: "#f2f3f5",
+                height: data.height,
+                width: data.width,
+                container: document.getElementById("canvas-container"),
+                updatePointer: this.handleChangePointer
+            });
+            this.setState({
+                activeSession: true,
+                sessionCode: sessionCode
+            });
+        }
+        else {
+            console.log("Unable To Join Session");
+        }
     }
 
     handleAddNewPage() {
@@ -809,12 +865,32 @@ class Session extends React.Component {
             <div>
                 <div id="canvas-container"></div>
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
-                <div className="session-box">
-                    <button onClick={this.createNewSession}>Start New Session</button>
-                    <input type="text" id="session-id" />
-                    <button onClick={this.joinExistingSession}>Join Session</button>
-                    <div id="session-id">{this.state.sessionId}</div>
+                <div className="session-box" style={{
+                    display: this.state.activeSession ? "none" : "flex",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100vh",
+                    alignItems: "center",
+                    background: "#eee",
+                    zIndex: 2002
+                }}>
+                    <div style={{
+                        display: "flex",
+                        flexDirection: "column"
+                    }}>
+
+                        <Button variant="contained" onClick={this.createNewSession} style={{
+                            marginBottom: 20
+                        }}>Start New Session</Button>
+
+                        <TextField variant="outlined" label="SESSION ID" id="session-code" />
+                        <Button variant="contained" color="secondary" onClick={this.joinExistingSession} style={{
+                            marginTop: 5
+                        }}>Join Session</Button>
+                        <div id="session-id">{this.state.sessionId}</div>
+                    </div>
                 </div>
+                <ShareDialog sessionId={this.state.sessionCode} />
                 <div className="tool-box-area" style={{
                     top: this.state.toolboxTop
                 }}>

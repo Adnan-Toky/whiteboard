@@ -2,6 +2,7 @@ body {
     height: 100vh;
     width: 100vw;
     overflow: hidden;
+    background-color: #fafbfc;
 }
 
 .tmp-canvas {
@@ -149,4 +150,11 @@ body {
     text-transform: uppercase;
     font-size: 14px;
     position: relative;
+}
+
+.share-button {
+    position: fixed;
+    right: 15px;
+    top: 15px;
+    z-index: 1001;
 }
