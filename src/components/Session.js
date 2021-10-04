@@ -15,6 +15,7 @@ import ColorPopup from "./ColorPicker";
 import ShareDialog from './ShareDialog';
 import RandomCodeGenerator from './RandomIdGenerator';
 import TextField from '@mui/material/TextField';
+import ParticipantsTab from './ParticipantsTab';
 
 
 import "./../css/canvas.css";
@@ -60,7 +61,9 @@ class Whiteboard {
             drawing: false,
             undoStackCount: 0,
             activeLineWidth: props.lineWidth * 100 / props.width,
-            activeLineColor: props.lineColor
+            activeLineColor: props.lineColor,
+            participantsTab: false,
+            participantsTabWidth: 200
         };
         this.action = {
             updatePointer: props.updatePointer
@@ -72,6 +75,14 @@ class Whiteboard {
         this.navigatePage(0);
         this.connectRTDB();
         this.loadData();
+    }
+
+    toggleParticipantsTab() {
+        this.canvas.participantsTab = !this.canvas.participantsTab;
+        if (this.canvas.participantsTab) document.getElementsByClassName("participants-tab")[0].style.display = "block";
+        else document.getElementsByClassName("participants-tab")[0].style.display = "none";
+        this.setDimensions();
+        console.log("****");
     }
 
     changeActiveObject(objectCode) {
@@ -454,9 +465,9 @@ class Whiteboard {
 
     setDimensions() {
         let lineWidth = this.canvas.activeLineWidth * this.canvas.width / 100;
-        let canvasWidth = window.innerWidth;
-        let canvasHeight = window.innerWidth * this.canvas.height / this.canvas.width;
-        if (window.innerWidth * this.canvas.height > this.canvas.width * window.innerHeight) {
+        let canvasWidth = window.innerWidth - (this.canvas.participantsTab ? this.canvas.participantsTabWidth : 0);
+        let canvasHeight = (window.innerWidth - (this.canvas.participantsTab ? this.canvas.participantsTabWidth : 0)) * this.canvas.height / this.canvas.width;
+        if ((window.innerWidth - (this.canvas.participantsTab ? this.canvas.participantsTabWidth : 0)) * this.canvas.height > this.canvas.width * window.innerHeight) {
             canvasHeight = window.innerHeight;
             canvasWidth = window.innerHeight * this.canvas.width / this.canvas.height;
         }
@@ -467,12 +478,12 @@ class Whiteboard {
             this.canvas.pages[i].height = canvasHeight;
             this.canvas.pages[i].width = canvasWidth;
             this.canvas.pages[i].style.top = (window.innerHeight - canvasHeight) / 2 + "px";
-            this.canvas.pages[i].style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+            this.canvas.pages[i].style.left = ((window.innerWidth - (this.canvas.participantsTab ? this.canvas.participantsTabWidth : 0)) - canvasWidth) / 2 + "px";
         }
         this.canvas.tmpPage.height = canvasHeight;
         this.canvas.tmpPage.width = canvasWidth;
         this.canvas.tmpPage.style.top = (window.innerHeight - canvasHeight) / 2 + "px";
-        this.canvas.tmpPage.style.left = (window.innerWidth - canvasWidth) / 2 + "px";
+        this.canvas.tmpPage.style.left = ((window.innerWidth - (this.canvas.participantsTab ? this.canvas.participantsTabWidth : 0)) - canvasWidth) / 2 + "px";
         this.reRender();
     }
 }
@@ -615,6 +626,7 @@ class Session extends React.Component {
             pen4Size: 5
         }
 
+        this.refreshParticipantsList = this.refreshParticipantsList.bind(this);
         this.createNewSession = this.createNewSession.bind(this);
         this.joinExistingSession = this.joinExistingSession.bind(this);
         this.handleAddNewPage = this.handleAddNewPage.bind(this);
@@ -632,6 +644,7 @@ class Session extends React.Component {
         this.handleChangeLineSize = this.handleChangeLineSize.bind(this);
         this.handleChangePenColor = this.handleChangePenColor.bind(this);
         this.handleChangePenSize = this.handleChangePenSize.bind(this);
+        this.handleToggleParticipantsTab = this.handleToggleParticipantsTab.bind(this);
     }
 
     async refreshParticipantsList(sessionId) {
@@ -639,6 +652,14 @@ class Session extends React.Component {
         let participantsList = [];
         querySnapshot.forEach((doc) => {
             console.log(doc.data());
+            let d = {
+                name: doc.data().name,
+                id: doc.data().id
+            };
+            participantsList.push(d);
+        });
+        this.setState({
+            participants: participantsList
         });
     }
 
@@ -674,7 +695,8 @@ class Session extends React.Component {
                 id: ref.id
             });
             await setDoc(doc(db, "sessions", ref.id, "participants", this.state.userId), {
-                name: "anymous-host"
+                name: "anymous-" + this.state.userId.slice(0, 5),
+                id: this.state.userId
             });
             await setDoc(doc(db, "sessions", ref.id, "participants", "random"), {
                 code: RandomIdGenerator(4)
@@ -684,7 +706,6 @@ class Session extends React.Component {
             console.log("Session Stublished with Code: ", session_code);
 
             onSnapshot(doc(db, "sessions", ref.id, "participants", "random"), (doc) => {
-                console.log("Current data: ", doc.data());
                 this.refreshParticipantsList(ref.id);
             });
 
@@ -750,7 +771,8 @@ class Session extends React.Component {
         if (docSnap.exists()) {
             let data = docSnap.data();
             await setDoc(doc(db, "sessions", ref.id, "participants", this.state.userId), {
-                name: "anynomus"
+                name: "anymous-" + this.state.userId.slice(0, 5),
+                id: this.state.userId
             });
             await setDoc(doc(db, "sessions", ref.id, "participants", "random"), {
                 code: RandomIdGenerator(4)
@@ -768,6 +790,10 @@ class Session extends React.Component {
                 lineWidth: this.state[this.state.activeTool + "Size"],
                 container: document.getElementById("canvas-container"),
                 updatePointer: this.handleChangePointer
+            });
+            onSnapshot(doc(db, "sessions", ref.id, "participants", "random"), (doc) => {
+                console.log("Current data: ", doc.data());
+                this.refreshParticipantsList(ref.id);
             });
             this.setState({
                 activeSession: true,
@@ -905,21 +931,24 @@ class Session extends React.Component {
         });
     }
 
+    handleToggleParticipantsTab() {
+        if (!this.board) return;
+        this.board.toggleParticipantsTab();
+    }
+
     render() {
         return (
             <div>
                 <div id="canvas-container"></div>
-                <div id="participants" style={{
+                <div style={{
                     position: "fixed",
-                    right: 100,
-                    top: 100,
-                    zIndex: 5000
+                    top: 0,
+                    left: 0,
+                    zIndex: 3000
                 }}>
-                    {this.state.participants.map((data, indx) => {
-                        <div key={indx}>{data}</div>
-                    })}
-
+                    <Button onClick={this.handleToggleParticipantsTab}>PPP</Button>
                 </div>
+                <ParticipantsTab list={this.state.participants} />
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
                 <div className="session-box" style={{
                     display: this.state.activeSession ? "none" : "flex",

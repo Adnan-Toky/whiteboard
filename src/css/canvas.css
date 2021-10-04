@@ -158,3 +158,14 @@ body {
     top: 15px;
     z-index: 1001;
 }
+
+.participants-tab {
+    position: fixed;
+    right: 0;
+    top: 0;
+    background-color: rgb(116, 104, 104);
+    width: 200px;
+    z-index: 4000;
+    height: 100vh;
+    display: none;
+}
