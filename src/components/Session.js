@@ -1,8 +1,8 @@
 import React from 'react';
 import { initializeApp } from '@firebase/app';
 import { getFirestore } from "firebase/firestore";
-import { collection, doc, addDoc, setDoc, getDocs, getDoc, query, where } from "firebase/firestore";
-import { getDatabase, ref, set, onValue } from '@firebase/database';
+import { collection, doc, addDoc, setDoc, getDocs, getDoc, query, where, onSnapshot } from "firebase/firestore";
+import { getDatabase, ref, set, onValue, get } from '@firebase/database';
 import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPen, faEraser, faUndo, faRedo, faChevronLeft, faChevronRight, faPlus } from '@fortawesome/free-solid-svg-icons';
@@ -18,6 +18,7 @@ import TextField from '@mui/material/TextField';
 
 
 import "./../css/canvas.css";
+import RandomIdGenerator from './RandomIdGenerator';
 
 const firebaseConfig = {
     apiKey: "AIzaSyB79GSw0yI2tSGXzeOSjeqj5K89fDj9Cyc",
@@ -107,15 +108,31 @@ class Whiteboard {
             this.canvas.dataList[doc.data().indx] = JSON.parse(doc.data().data);
             // this.draw(doc.data().indx);
         });
-        let intv = setInterval((function () {
-            if (this.canvas.currentObject !== -1) {
-                for (let i = 0; i <= this.canvas.currentObject; i++) {
-                    this.draw(i);
-                }
-                // console.log(this.canvas.currentObject);
-                clearInterval(intv);
+
+        get(ref(rtdb, this.config.sessionId)).then((snapshot) => {
+            if (snapshot.exists()) {
+                let data = snapshot.val();
+                this.drawTmp(data);
+                this.lastData = data;
             }
-        }).bind(this), 100);
+            for (let i = 0; i <= this.canvas.currentObject; i++) {
+                this.draw(i);
+            }
+            if (this.config.userId === this.config.hostId) this.config.role = "editor";
+        }).catch((err) => {
+            console.log(err);
+            if (this.config.userId === this.config.hostId) this.config.role = "editor";
+        });
+
+        // let intv = setInterval((function () {
+        //     if (this.canvas.currentObject !== -1) {
+        //         for (let i = 0; i <= this.canvas.currentObject; i++) {
+        //             this.draw(i);
+        //         }
+        //         // console.log(this.canvas.currentObject);
+        //         clearInterval(intv);
+        //     }
+        // }).bind(this), 100);
     }
 
     async syncData(indx) {
@@ -580,6 +597,7 @@ class Session extends React.Component {
             loggedIn: false,
             role: "",
             hostId: "",
+            participants: [],
             activeSession: false,
             toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
             activeTool: "pen1",
@@ -616,6 +634,14 @@ class Session extends React.Component {
         this.handleChangePenSize = this.handleChangePenSize.bind(this);
     }
 
+    async refreshParticipantsList(sessionId) {
+        const querySnapshot = await getDocs(collection(db, "sessions", sessionId, "participants"));
+        let participantsList = [];
+        querySnapshot.forEach((doc) => {
+            console.log(doc.data());
+        });
+    }
+
     async createNewSession() {
         if (!this.state.loggedIn) return;
         console.log("Starting New Session");
@@ -631,25 +657,36 @@ class Session extends React.Component {
                     count++;
                 });
                 session_code = code;
-                if (count == 0) break;
+                if (count === 0) break;
             }
 
             const ref = await addDoc(collection(db, "sessions"), {
                 host: this.state.userId,
-                participants: [this.state.userId],
+                participants: RandomIdGenerator(4),
                 pageCount: 1,
                 objectCount: 0,
                 width: window.innerWidth,
                 height: window.innerHeight,
                 code: session_code
             });
-            const ref_details = await addDoc(collection(db, "session_details"), {
+            await addDoc(collection(db, "session_details"), {
                 code: session_code,
                 id: ref.id
+            });
+            await setDoc(doc(db, "sessions", ref.id, "participants", this.state.userId), {
+                name: "anymous-host"
+            });
+            await setDoc(doc(db, "sessions", ref.id, "participants", "random"), {
+                code: RandomIdGenerator(4)
             });
 
             console.log("Session Stublished with ID: ", ref.id);
             console.log("Session Stublished with Code: ", session_code);
+
+            onSnapshot(doc(db, "sessions", ref.id, "participants", "random"), (doc) => {
+                console.log("Current data: ", doc.data());
+                this.refreshParticipantsList(ref.id);
+            });
 
             this.setState({
                 sessionId: ref.id,
@@ -712,15 +749,23 @@ class Session extends React.Component {
 
         if (docSnap.exists()) {
             let data = docSnap.data();
+            await setDoc(doc(db, "sessions", ref.id, "participants", this.state.userId), {
+                name: "anynomus"
+            });
+            await setDoc(doc(db, "sessions", ref.id, "participants", "random"), {
+                code: RandomIdGenerator(4)
+            });
             this.board = new Whiteboard({
                 sessionId: sessionId,
                 sessionPassword: "",
-                hostId: "",
+                hostId: data.host,
                 userId: this.state.userId,
                 role: "viewer",
                 bgColor: "#f2f3f5",
                 height: data.height,
                 width: data.width,
+                lineColor: this.state[this.state.activeTool + "Color"],
+                lineWidth: this.state[this.state.activeTool + "Size"],
                 container: document.getElementById("canvas-container"),
                 updatePointer: this.handleChangePointer
             });
@@ -864,6 +909,17 @@ class Session extends React.Component {
         return (
             <div>
                 <div id="canvas-container"></div>
+                <div id="participants" style={{
+                    position: "fixed",
+                    right: 100,
+                    top: 100,
+                    zIndex: 5000
+                }}>
+                    {this.state.participants.map((data, indx) => {
+                        <div key={indx}>{data}</div>
+                    })}
+
+                </div>
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
                 <div className="session-box" style={{
                     display: this.state.activeSession ? "none" : "flex",
@@ -928,7 +984,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox2 ? (
-                                                <PenToolBox indx={2} activeColor={this.state.pen2Color} activeSize={this.state.pen2Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
+                                                <PenToolBox indx={2} activeColor={this.state.pen2Color} activeSize={this.state.pen2Size} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -948,7 +1004,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox3 ? (
-                                                <PenToolBox indx={3} activeColor={this.state.pen3Color} activeSize={this.state.pen3Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
+                                                <PenToolBox indx={3} activeColor={this.state.pen3Color} activeSize={this.state.pen3Size} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>
@@ -968,7 +1024,7 @@ class Session extends React.Component {
                                                 </div>
                                             </div>
                                             {this.state.penToolBox4 ? (
-                                                <PenToolBox indx={4} activeColor={this.state.pen4Color} activeSize={this.state.pen4Size} handleChangePenColor={this.handleChangePenColor} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
+                                                <PenToolBox indx={4} activeColor={this.state.pen4Color} activeSize={this.state.pen4Size} handleChangePenColor={this.handleChangePenColor} handleChangePenSize={this.handleChangePenSize} />
                                             ) : null}
                                         </div>
                                     </ClickAwayListener>

@@ -4,8 +4,6 @@ import Button from '@mui/material/Button';
 import ShareIcon from '@mui/icons-material/Share';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -51,7 +49,7 @@ export default function Dialogs(props) {
                     <div style={{
                         minWidth: 200
                     }}>
-                        Session ID: <br />{props.sessionId}
+                        Session ID: <br />  {props.sessionId}
                     </div>
                 </DialogContent>
             </Dialog>

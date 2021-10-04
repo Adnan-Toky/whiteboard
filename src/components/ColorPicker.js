@@ -28,6 +28,7 @@ const colorList = [
 
 function ColorPopup(props) {
     let [w, h] = useWindowSize();
+    if (h === -1) return;
     let width = Math.min(460, w - 74);
     return (
         <Dialog
@@ -75,22 +76,22 @@ function ColorPopup(props) {
     );
 }
 
-function PickColor(props) {
-    const [open, setOpen] = React.useState(false);
+// function PickColor(props) {
+//     const [open, setOpen] = React.useState(false);
 
-    const handleClose = () => {
-        setOpen(false);
-    }
+//     const handleClose = () => {
+//         setOpen(false);
+//     }
 
-    return (
-        <div style={{ display: "inline-block" }}>
-            <Button style={{
-                backgroundColor: props.value,
-                height: 20
-            }} onClick={() => { setOpen(true) }}></Button>
-            <ColorPopup open={open} handleClose={handleClose} handlePick={props.handlePick} />
-        </div>
-    );
-}
+//     return (
+//         <div style={{ display: "inline-block" }}>
+//             <Button style={{
+//                 backgroundColor: props.value,
+//                 height: 20
+//             }} onClick={() => { setOpen(true) }}></Button>
+//             <ColorPopup open={open} handleClose={handleClose} handlePick={props.handlePick} />
+//         </div>
+//     );
+// }
 
 export default ColorPopup;

@@ -2,9 +2,7 @@ import * as React from 'react';
 import PropTypes from 'prop-types';
 import Slider, { SliderThumb } from '@mui/material/Slider';
 import { styled } from '@mui/material/styles';
-import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
-import Box from '@mui/material/Box';
 
 function ValueLabelComponent(props) {
     const { children, value } = props;
@@ -20,74 +18,6 @@ ValueLabelComponent.propTypes = {
     children: PropTypes.element.isRequired,
     value: PropTypes.number.isRequired,
 };
-
-const iOSBoxShadow =
-    '0 3px 1px rgba(0,0,0,0.1),0 4px 8px rgba(0,0,0,0.13),0 0 0 1px rgba(0,0,0,0.02)';
-
-const marks = [
-    {
-        value: 0,
-    },
-    {
-        value: 20,
-    },
-    {
-        value: 37,
-    },
-    {
-        value: 100,
-    },
-];
-
-const IOSSlider = styled(Slider)(({ theme }) => ({
-    color: theme.palette.mode === 'dark' ? '#3880ff' : '#3880ff',
-    height: 2,
-    padding: '15px 0',
-    '& .MuiSlider-thumb': {
-        height: 28,
-        width: 28,
-        backgroundColor: '#fff',
-        boxShadow: iOSBoxShadow,
-        '&:focus, &:hover, &.Mui-active': {
-            boxShadow:
-                '0 3px 1px rgba(0,0,0,0.1),0 4px 8px rgba(0,0,0,0.3),0 0 0 1px rgba(0,0,0,0.02)',
-            // Reset on touch devices, it doesn't add specificity
-            '@media (hover: none)': {
-                boxShadow: iOSBoxShadow,
-            },
-        },
-    },
-    '& .MuiSlider-valueLabel': {
-        fontSize: 12,
-        fontWeight: 'normal',
-        top: -6,
-        backgroundColor: 'unset',
-        color: theme.palette.text.primary,
-        '&:before': {
-            display: 'none',
-        },
-        '& *': {
-            background: 'transparent',
-            color: theme.palette.mode === 'dark' ? '#fff' : '#000',
-        },
-    },
-    '& .MuiSlider-track': {
-        border: 'none',
-    },
-    '& .MuiSlider-rail': {
-        opacity: 0.5,
-        backgroundColor: '#bfbfbf',
-    },
-    '& .MuiSlider-mark': {
-        backgroundColor: '#bfbfbf',
-        height: 8,
-        width: 1,
-        '&.MuiSlider-markActive': {
-            opacity: 1,
-            backgroundColor: 'currentColor',
-        },
-    },
-}));
 
 const PrettoSlider = styled(Slider)({
     color: '#52af77',
@@ -128,36 +58,6 @@ const PrettoSlider = styled(Slider)({
         },
     },
 });
-
-const AirbnbSlider = styled(Slider)(({ theme }) => ({
-    color: '#3a8589',
-    height: 3,
-    padding: '13px 0',
-    '& .MuiSlider-thumb': {
-        height: 27,
-        width: 27,
-        backgroundColor: '#fff',
-        border: '1px solid currentColor',
-        '&:hover': {
-            boxShadow: '0 0 0 8px rgba(58, 133, 137, 0.16)',
-        },
-        '& .airbnb-bar': {
-            height: 9,
-            width: 1,
-            backgroundColor: 'currentColor',
-            marginLeft: 1,
-            marginRight: 1,
-        },
-    },
-    '& .MuiSlider-track': {
-        height: 3,
-    },
-    '& .MuiSlider-rail': {
-        color: theme.palette.mode === 'dark' ? '#bfbfbf' : '#d8d8d8',
-        opacity: theme.palette.mode === 'dark' ? undefined : 1,
-        height: 3,
-    },
-}));
 
 function AirbnbThumbComponent(props) {
     const { children, ...other } = props;
