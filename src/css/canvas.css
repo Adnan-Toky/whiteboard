@@ -157,7 +157,7 @@ body {
 
 .share-button {
     position: fixed;
-    right: 15px;
+    right: 75px;
     top: 15px;
     z-index: 1001;
 }

@@ -15,7 +15,9 @@ import ColorPopup from "./ColorPicker";
 import ShareDialog from './ShareDialog';
 import RandomCodeGenerator from './RandomIdGenerator';
 import TextField from '@mui/material/TextField';
+import { IconButton } from '@material-ui/core';
 import ParticipantsTab from './ParticipantsTab';
+import PeopleIcon from '@mui/icons-material/People';
 
 
 import "./../css/canvas.css";
@@ -942,11 +944,16 @@ class Session extends React.Component {
                 <div id="canvas-container"></div>
                 <div style={{
                     position: "fixed",
-                    top: 0,
-                    left: 0,
-                    zIndex: 3000
+                    top: 5,
+                    right: 10,
+                    zIndex: 1000
                 }}>
-                    <Button onClick={this.handleToggleParticipantsTab}>PPP</Button>
+                    <Tooltip title="Participants">
+                        <IconButton color="primary" onClick={this.handleToggleParticipantsTab}><PeopleIcon sx={{
+                            fontSize: 33,
+                            color: "#1976d2"
+                        }} /></IconButton>
+                    </Tooltip>
                 </div>
                 <ParticipantsTab list={this.state.participants} onClose={this.handleToggleParticipantsTab} />
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />

@@ -35,8 +35,8 @@ function ParticipantsTab(props) {
                 <span>Participants</span>
                 <IconButton onClick={props.onClose} style={{
                     position: "absolute",
-                    right: 0,
-                    top: 0
+                    right: 15,
+                    top: 12
                 }}>
                     <CloseIcon />
                 </IconButton>
