@@ -63,7 +63,7 @@ class Whiteboard {
             activeLineWidth: props.lineWidth * 100 / props.width,
             activeLineColor: props.lineColor,
             participantsTab: false,
-            participantsTabWidth: 200
+            participantsTabWidth: 260
         };
         this.action = {
             updatePointer: props.updatePointer
@@ -82,7 +82,6 @@ class Whiteboard {
         if (this.canvas.participantsTab) document.getElementsByClassName("participants-tab")[0].style.display = "block";
         else document.getElementsByClassName("participants-tab")[0].style.display = "none";
         this.setDimensions();
-        console.log("****");
     }
 
     changeActiveObject(objectCode) {
@@ -608,7 +607,7 @@ class Session extends React.Component {
             loggedIn: false,
             role: "",
             hostId: "",
-            participants: [],
+            participants: [{ name: "Adnan Zawad", id: "ytdy34" }, { name: "Rezwanus Sadat Rifat", id: "384sjb" }],
             activeSession: false,
             toolboxTop: (window.innerHeight - this.toolboxHeight) / 2,
             activeTool: "pen1",
@@ -651,12 +650,13 @@ class Session extends React.Component {
         const querySnapshot = await getDocs(collection(db, "sessions", sessionId, "participants"));
         let participantsList = [];
         querySnapshot.forEach((doc) => {
-            console.log(doc.data());
-            let d = {
-                name: doc.data().name,
-                id: doc.data().id
-            };
-            participantsList.push(d);
+            if (doc.data().name) {
+                let d = {
+                    name: doc.data().name,
+                    id: doc.data().id
+                };
+                participantsList.push(d);
+            }
         });
         this.setState({
             participants: participantsList
@@ -948,7 +948,7 @@ class Session extends React.Component {
                 }}>
                     <Button onClick={this.handleToggleParticipantsTab}>PPP</Button>
                 </div>
-                <ParticipantsTab list={this.state.participants} />
+                <ParticipantsTab list={this.state.participants} onClose={this.handleToggleParticipantsTab} />
                 <Pointer size={this.state.size} top={this.state.top} left={this.state.left} vis={this.state.vis} icon={this.state.icon} />
                 <div className="session-box" style={{
                     display: this.state.activeSession ? "none" : "flex",
